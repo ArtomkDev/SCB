@@ -1,22 +1,38 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { getGuildConfig, updateGuildConfig } = require('../../services/firebaseService');
+const { startCall } = require('../../services/pingLoopService');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('ping')
-        .setDescription('Replies with Pong and tracks usage per server!'),
+        .setDescription('Почати виклик користувача у приватні повідомлення')
+        .setDMPermission(false)
+        .addUserOption(option => 
+            option.setName('target')
+                .setDescription('Користувач, якого потрібно викликати')
+                .setRequired(true)
+        ),
     
     async execute(interaction) {
+        if (!interaction.inGuild()) {
+            return interaction.reply({ content: '❌ Ей, ця команда працює тільки на серверах!', ephemeral: true });
+        }
+
         await interaction.deferReply();
+        const targetUser = interaction.options.getUser('target');
 
-        const guildId = interaction.guildId;
-        const config = await getGuildConfig(guildId);
+        if (targetUser.bot) {
+            return interaction.editReply('❌ Ботам в лічку стукати марно, залиш їх у спокої. 🤖');
+        }
+        if (targetUser.id === interaction.user.id) {
+            return interaction.editReply('❌ Тобі настільки самотньо? Самому собі спамити не можна. 😅');
+        }
+
+        const guildName = interaction.guild ? interaction.guild.name : 'одного з серверів';
         
-        const currentUsage = config.pingUsage || 0;
-        const newUsage = currentUsage + 1;
+        const result = await startCall(interaction, targetUser, guildName);
 
-        await updateGuildConfig(guildId, { pingUsage: newUsage });
-
-        await interaction.editReply(`Pong! Цей сервер викликав команду ping ${newUsage} разів.`);
-    },
+        if (!result.success && result.reason === 'ALREADY_CALLING') {
+            await interaction.editReply(`⚠️ ${targetUser.toString()} вже і так розривають повідомленнями! Натисни кнопку "Зупинити виклик" на попередньому повідомленні бота.`);
+        }
+    }
 };
