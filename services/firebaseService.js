@@ -22,4 +22,15 @@ const updateGuildConfig = async (guildId, data) => {
     await db.collection('guilds').doc(guildId).set(data, { merge: true }); 
 };
 
-module.exports = { db, getGuildConfig, updateGuildConfig };
+const getSessionsState = async (guildId) => {
+    validateGuildId(guildId);
+    const doc = await db.collection('sessions').doc(guildId).get();
+    return doc.exists ? doc.data() : {};
+};
+
+const saveSessionsState = async (guildId, data) => {
+    validateGuildId(guildId);
+    await db.collection('sessions').doc(guildId).set(data);
+};
+
+module.exports = { db, getGuildConfig, updateGuildConfig, getSessionsState, saveSessionsState };
