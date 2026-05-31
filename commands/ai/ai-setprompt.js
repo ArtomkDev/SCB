@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildConfig } = require('../../services/firebaseService');
+const { getUI, formatUI } = require('../../services/uiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,15 +19,16 @@ module.exports = {
 
         const promptText = interaction.options.getString('prompt');
         const guildId = interaction.guild.id;
-
+        
         await interaction.deferReply({ ephemeral: true });
+        
+        const ui = await getUI(guildId, 'ai');
 
         try {
             await updateGuildConfig(guildId, { aiSystemPrompt: promptText });
-            await interaction.editReply(`✅ **Успішно!** Характер ШІ для цього сервера оновлено.\nПоточний промпт: \`${promptText}\``);
+            await interaction.editReply(formatUI(ui.promptSaved, { prompt: promptText }));
         } catch (error) {
-            console.error(`[COMMAND ERROR] /ai-setprompt failed on guild ${guildId}:`, error);
-            await interaction.editReply('❌ Виникла помилка при збереженні промпту в базу даних.');
+            await interaction.editReply(ui.promptSaveError);
         }
     }
 };

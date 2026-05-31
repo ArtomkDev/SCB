@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { updateGuildConfig } = require('../../services/firebaseService');
+const { getUI, formatUI } = require('../../services/uiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -29,6 +30,7 @@ module.exports = {
         const provider = interaction.options.getString('provider');
         const key = interaction.options.getString('key');
         const guildId = interaction.guild.id;
+        const ui = await getUI(guildId, 'ai');
 
         try {
             await updateGuildConfig(guildId, {
@@ -37,10 +39,9 @@ module.exports = {
                 }
             });
 
-            await interaction.editReply(`✅ Ключ для **${provider}** успішно збережено в базі даних сервера!`);
+            await interaction.editReply(formatUI(ui.keySaved, { provider }));
         } catch (error) {
-            console.error(`Failed to set AI key for guild ${guildId}:`, error);
-            await interaction.editReply('❌ Помилка збереження ключа в базу даних.');
+            await interaction.editReply(ui.keySaveError);
         }
     }
 };

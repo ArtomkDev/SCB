@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { generateAiResponse } = require('../../services/aiService');
 const { getGuildConfig } = require('../../services/firebaseService');
+const { getUI } = require('../../services/uiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -15,7 +16,8 @@ module.exports = {
         await interaction.deferReply();
 
         const userPrompt = interaction.options.getString('prompt');
-        const guildId = interaction.guildId;
+        const guildId = interaction.guild.id;
+        const ui = await getUI(guildId, 'ai');
 
         try {
             const guildConfig = await getGuildConfig(guildId);
@@ -30,8 +32,7 @@ module.exports = {
             await interaction.editReply(safeResponse);
             
         } catch (error) {
-            console.error(`[COMMAND ERROR] /ask execution failed in guild ${guildId}:`, error);
-            await interaction.editReply('❌ Вибачте, сталася помилка під час генерації відповіді. Всі AI провайдери наразі недоступні.');
+            await interaction.editReply(ui.askError);
         }
     },
 };

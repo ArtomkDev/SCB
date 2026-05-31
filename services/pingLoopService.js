@@ -1,21 +1,22 @@
 const { Collection, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { formatUI } = require('./uiService');
 
 const activeCalls = new Collection();
 
-const startCall = async (interaction, targetUser, guildName) => {
+const startCall = async (interaction, targetUser, guildName, ui) => {
     if (activeCalls.has(targetUser.id)) {
         return { success: false, reason: 'ALREADY_CALLING' };
     }
 
     const stopButton = new ButtonBuilder()
         .setCustomId(`stop_ping_${targetUser.id}`)
-        .setLabel('Зупинити виклик')
+        .setLabel('Stop')
         .setStyle(ButtonStyle.Danger);
 
     const row = new ActionRowBuilder().addComponents(stopButton);
 
     const initialMessage = await interaction.editReply({
-        content: `✅ Погнали! Почали стукати до ${targetUser.toString()}.`,
+        content: formatUI(ui.started, { user: targetUser.toString() }),
         components: [row]
     });
 
@@ -33,17 +34,17 @@ const startCall = async (interaction, targetUser, guildName) => {
                 content: reasonText,
                 components: [] 
             });
-        } catch (error) {
-            console.error('Не вдалося оновити повідомлення виклику:', error);
-        }
+        } catch (error) {}
     };
 
+    const dmMessage = formatUI(ui.dmMessage, { guild: guildName, user: interaction.user.toString() });
+
     try {
-        await targetUser.send(`👋 Ей! На сервері **${guildName}** тебе дуже терміново шукає ${interaction.user.toString()}! Залітай туди.`);
+        await targetUser.send(dmMessage);
         count++;
     } catch (error) {
         await interaction.editReply({
-            content: `❌ Не вийшло достукатись до ${targetUser.toString()} — у нього закрита лічка.`,
+            content: formatUI(ui.closedDm, { user: targetUser.toString() }),
             components: []
         });
         return { success: true };
@@ -51,15 +52,15 @@ const startCall = async (interaction, targetUser, guildName) => {
 
     const intervalId = setInterval(async () => {
         if (count >= MAX_PINGS) {
-            await cleanupCall(`⌛ Виклик ${targetUser.toString()} завершено (досягнуто ліміт у 10 повідомлень).`);
+            await cleanupCall(formatUI(ui.limitReached, { user: targetUser.toString() }));
             return;
         }
 
         try {
-            await targetUser.send(`👋 Ей! На сервері **${guildName}** тебе дуже терміново шукає ${interaction.user.toString()}! Залітай туди.`);
+            await targetUser.send(dmMessage);
             count++;
         } catch (error) {
-            await cleanupCall(`❌ Виклик перервано: у ${targetUser.toString()} закрилися приватні повідомлення.`);
+            await cleanupCall(formatUI(ui.closedDm, { user: targetUser.toString() }));
         }
     }, PING_INTERVAL_MS);
 
@@ -70,15 +71,11 @@ const startCall = async (interaction, targetUser, guildName) => {
 
     collector.on('collect', async (buttonInteraction) => {
         await buttonInteraction.deferUpdate();
-        
-        await cleanupCall(`🛑 ${buttonInteraction.user.toString()} змилувався і зупинив спам для ${targetUser.toString()}. Спокій відновлено.`);
+        await cleanupCall(formatUI(ui.stoppedByUser, { user: buttonInteraction.user.toString(), target: targetUser.toString() }));
     });
 
-    // Зберігаємо в пам'ять
     activeCalls.set(targetUser.id, { intervalId, collector });
     return { success: true };
 };
 
-module.exports = {
-    startCall
-};
+module.exports = { startCall };

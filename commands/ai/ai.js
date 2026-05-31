@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { generateAiResponse } = require('../../services/aiService');
 const { getGuildConfig } = require('../../services/firebaseService');
+const { getUI, formatUI } = require('../../services/uiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -18,13 +19,14 @@ module.exports = {
 
         const userPrompt = interaction.options.getString('prompt');
         const guildId = interaction.guild.id;
+        const ui = await getUI(guildId, 'ai');
 
         try {
             const guildConfig = await getGuildConfig(guildId);
             const apiKeys = guildConfig.apiKeys || {};
 
             if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic) {
-                return interaction.editReply('⚠️ **Помилка:** На цьому сервері не налаштовано жодного API ключа.\nБудь ласка, попросіть адміністратора додати ключ за допомогою команди `/aikey`.');
+                return interaction.editReply(ui.keyMissing);
             }
 
             const systemPrompt = guildConfig.aiSystemPrompt || "You are a helpful Discord bot.";
@@ -38,7 +40,7 @@ module.exports = {
             await interaction.editReply(safeResponse);
 
         } catch (error) {
-            const errorMessage = `❌ **Не вдалося отримати відповідь від AI провайдерів:**\n\n${error.message}`;
+            const errorMessage = formatUI(ui.aiError, { error: error.message });
             await interaction.editReply(errorMessage.length > 2000 ? errorMessage.substring(0, 1997) + '...' : errorMessage);
         }
     }

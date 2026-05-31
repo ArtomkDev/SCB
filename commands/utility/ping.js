@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { startCall } = require('../../services/pingLoopService');
+const { getUI } = require('../../services/uiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -13,26 +14,25 @@ module.exports = {
         ),
     
     async execute(interaction) {
-        if (!interaction.inGuild()) {
-            return interaction.reply({ content: '❌ Ей, ця команда працює тільки на серверах!', ephemeral: true });
-        }
+        if (!interaction.inGuild()) return;
 
         await interaction.deferReply();
         const targetUser = interaction.options.getUser('target');
+        const ui = await getUI(interaction.guild.id, 'ping');
 
         if (targetUser.bot) {
-            return interaction.editReply('❌ Ботам в лічку стукати марно, залиш їх у спокої. 🤖');
+            return interaction.editReply(ui.botError);
         }
         if (targetUser.id === interaction.user.id) {
-            return interaction.editReply('❌ Тобі настільки самотньо? Самому собі спамити не можна. 😅');
+            return interaction.editReply(ui.selfError);
         }
 
-        const guildName = interaction.guild ? interaction.guild.name : 'одного з серверів';
+        const guildName = interaction.guild ? interaction.guild.name : 'Unknown';
         
-        const result = await startCall(interaction, targetUser, guildName);
+        const result = await startCall(interaction, targetUser, guildName, ui);
 
         if (!result.success && result.reason === 'ALREADY_CALLING') {
-            await interaction.editReply(`⚠️ ${targetUser.toString()} вже і так розривають повідомленнями! Натисни кнопку "Зупинити виклик" на попередньому повідомленні бота.`);
+            return interaction.editReply(`ALREADY_CALLING`); 
         }
     }
 };

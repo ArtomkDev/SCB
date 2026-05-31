@@ -1,5 +1,6 @@
 const { ActivityType, EmbedBuilder } = require('discord.js');
 const { getSessionsState, saveSessionsState } = require('./firebaseService');
+const { getUI } = require('./uiService');
 
 const formatTime = (ms) => {
     const totalMinutes = Math.floor(ms / 60000);
@@ -83,17 +84,19 @@ const processGuildSessions = async (client, guildId) => {
             if (channel) {
                 const message = await channel.messages.fetch(state.lastMessage.messageId);
                 if (message) {
+                    const ui = await getUI(guildId, 'sessions');
+
                     const embed = new EmbedBuilder()
                         .setColor('#57F287')
-                        .setTitle('🎮 Активні катки')
-                        .setFooter({ text: 'Останнє оновлення' })
+                        .setTitle(ui.title)
+                        .setFooter({ text: ui.footer })
                         .setTimestamp();
 
                     const gameNames = Object.keys(state.games);
                     let description = '';
 
                     if (gameNames.length === 0) {
-                        description = '*Наразі немає активних ігрових сесій.*';
+                        description = ui.empty;
                     } else {
                         const sortedGames = gameNames.map(name => ({
                             name,
