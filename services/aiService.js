@@ -1,50 +1,68 @@
 const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
+const { OpenAI } = require('openai');
+const Anthropic = require('@anthropic-ai/sdk');
 
-const generateAiResponse = async (prompt, systemPrompt) => {
-    const apiKey = process.env.AI_API_KEY;
-    
-    if (!apiKey) {
-        throw new Error('AI_API_KEY відсутній у змінних середовища (.env).');
-    }
-
-    try {
-        const genAI = new GoogleGenerativeAI(apiKey);
-        
-        const safetySettings = [
-            {
-                category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-            {
-                category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-                threshold: HarmBlockThreshold.BLOCK_NONE,
-            },
-        ];
-
-        const model = genAI.getGenerativeModel({
-            model: 'gemini-2.5-flash', 
-            systemInstruction: systemPrompt,
-            safetySettings: safetySettings 
-        });
-
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        
-        return response.text();
-    } catch (error) {
-        console.error('[AI SERVICE ERROR] Помилка API Gemini:', error);
-        throw new Error(`AI API request failed: ${error.message}`);
-    }
+const callGemini = async (prompt, systemPrompt, apiKey) => {
+    const gemini = new GoogleGenerativeAI(apiKey);
+    const model = gemini.getGenerativeModel({
+        model: 'gemini-2.5-flash',
+        systemInstruction: systemPrompt,
+        safetySettings: [
+            { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_NONE },
+            { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_NONE },
+        ]
+    });
+    const result = await model.generateContent(prompt);
+    return result.response.text();
 };
 
-module.exports = {
-    generateAiResponse
+const callOpenAI = async (prompt, systemPrompt, apiKey) => {
+    const openai = new OpenAI({ apiKey });
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
+    });
+    return response.choices[0].message.content;
 };
+
+const callAnthropic = async (prompt, systemPrompt, apiKey) => {
+    const anthropic = new Anthropic({ apiKey });
+    const response = await anthropic.messages.create({
+        model: "claude-3-haiku-20240307",
+        system: systemPrompt,
+        max_tokens: 2000,
+        messages: [{ role: "user", content: prompt }]
+    });
+    return response.content[0].text;
+};
+
+const generateAiResponse = async (prompt, systemPrompt = "You are a helpful assistant.", keys = {}) => {
+    const errors = [];
+
+    if (keys.gemini) {
+        try { return await callGemini(prompt, systemPrompt, keys.gemini); } 
+        catch (e) { errors.push(`**Gemini**: ${e.message}`); }
+    } else {
+        errors.push(`**Gemini**: Ключ не налаштовано.`);
+    }
+
+    if (keys.openai) {
+        try { return await callOpenAI(prompt, systemPrompt, keys.openai); } 
+        catch (e) { errors.push(`**OpenAI (GPT)**: ${e.message}`); }
+    } else {
+        errors.push(`**OpenAI (GPT)**: Ключ не налаштовано.`);
+    }
+
+    if (keys.anthropic) {
+        try { return await callAnthropic(prompt, systemPrompt, keys.anthropic); } 
+        catch (e) { errors.push(`**Claude**: ${e.message}`); }
+    } else {
+        errors.push(`**Claude**: Ключ не налаштовано.`);
+    }
+
+    throw new Error(errors.join('\n'));
+};
+
+module.exports = { generateAiResponse };

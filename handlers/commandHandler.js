@@ -13,11 +13,8 @@ module.exports = (client) => {
             const filePath = path.join(folderPath, file);
             const command = require(filePath);
 
-            // Enforce strictly defined structure for commands
             if ('data' in command && 'execute' in command) {
                 client.commands.set(command.data.name, command);
-            } else {
-                console.warn(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
             }
         }
     }

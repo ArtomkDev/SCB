@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { Client, Collection, GatewayIntentBits } = require('discord.js');
 
-// Explicit intent declaration is required by Discord API
 const client = new Client({ 
     intents: [GatewayIntentBits.Guilds] 
 });

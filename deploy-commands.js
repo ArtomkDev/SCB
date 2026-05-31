@@ -4,7 +4,6 @@ const fs = require('fs');
 const path = require('path');
 
 const commands = [];
-// Вказуємо шлях до папки з командами
 const commandsPath = path.join(__dirname, 'commands');
 const commandFolders = fs.readdirSync(commandsPath);
 
@@ -22,14 +21,12 @@ for (const folder of commandFolders) {
     }
 }
 
-// Підключаємося до Discord API
 const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
 
 (async () => {
     try {
         console.log(`Started refreshing ${commands.length} application (/) commands.`);
 
-        // Відправляємо всі команди в Discord
         const data = await rest.put(
             Routes.applicationCommands(process.env.DISCORD_CLIENT_ID),
             { body: commands },
