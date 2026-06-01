@@ -36,7 +36,7 @@ async function getHallOfFameData(guildId, client) {
             
             const playersSnapshot = await db.collection('guilds').doc(guildId).collection('gameStats')
                 .doc(gameName).collection('players').get();
-                
+            
             const playersMap = new Map();
             for (const pDoc of playersSnapshot.docs) {
                 playersMap.set(pDoc.id, { username: pDoc.data().username, time: pDoc.data().time || 0 });
@@ -49,11 +49,18 @@ async function getHallOfFameData(guildId, client) {
         dbCache.set(cacheKey, cached);
     }
 
+    const guild = client ? client.guilds.cache.get(guildId) : null;
     const mergedGames = new Map();
+
     for (const [key, val] of cached.data.entries()) {
         const playersCopy = new Map();
         for (const [pKey, pVal] of val.players.entries()) {
-            playersCopy.set(pKey, { ...pVal });
+            let displayName = pVal.username;
+            if (guild) {
+                const member = guild.members.cache.get(pKey);
+                if (member) displayName = member.displayName;
+            }
+            playersCopy.set(pKey, { username: displayName, time: pVal.time });
         }
         mergedGames.set(key, { totalTime: val.totalTime, players: playersCopy });
     }
@@ -70,7 +77,7 @@ async function getHallOfFameData(guildId, client) {
                 const gameData = mergedGames.get(activeGameName);
                 
                 for (const [playerId, playerObj] of Object.entries(activeGameData.players)) {
-                    const activeDuration = Date.now() - playerObj.startTime; 
+                    const activeDuration = Date.now() - playerObj.startTime;
                     
                     gameData.totalTime += activeDuration;
                     
@@ -78,6 +85,13 @@ async function getHallOfFameData(guildId, client) {
                         gameData.players.set(playerId, { username: playerObj.displayName, time: 0 });
                     }
                     gameData.players.get(playerId).time += activeDuration;
+
+                    if (guild) {
+                        const member = guild.members.cache.get(playerId);
+                        if (member) {
+                            gameData.players.get(playerId).username = member.displayName;
+                        }
+                    }
                 }
             }
         }
@@ -91,7 +105,7 @@ async function getHallOfFameData(guildId, client) {
         const sortedPlayers = Array.from(gameData.players.values())
             .sort((a, b) => b.time - a.time)
             .slice(0, 3);
-            
+        
         hallOfFame.push({
             gameName,
             totalTime: gameData.totalTime,
@@ -108,6 +122,7 @@ function formatTime(ms) {
     
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
+
     return hours > 0 ? `${hours} год ${minutes} хв` : `${minutes} хв`;
 }
 

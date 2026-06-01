@@ -2,6 +2,7 @@ const { ActivityType, EmbedBuilder } = require('discord.js');
 const { getSessionsState, saveSessionsState } = require('./firebaseService');
 const { getUI, formatUI } = require('./uiService');
 const { updateGameTime, getHallOfFameData, formatTime } = require('./playtimeService');
+const { getVoiceHallOfFame, activeVoiceSessions, handleVoiceState } = require('./voiceService');
 
 const processGuildSessions = async (client, guildId) => {
     const guild = client.guilds.cache.get(guildId);
@@ -19,7 +20,18 @@ const processGuildSessions = async (client, guildId) => {
     const activeGamesFromDiscord = new Map();
 
     for (const [memberId, member] of members) {
-        if (member.user.bot || !member.presence) continue;
+        if (member.user.bot) continue;
+
+        const sessionKey = `${guildId}_${memberId}`;
+        const inVoice = !!member.voice?.channelId;
+
+        if (inVoice && !activeVoiceSessions.has(sessionKey)) {
+            handleVoiceState(guildId, memberId, member.displayName, 'join').catch(() => {});
+        } else if (!inVoice && activeVoiceSessions.has(sessionKey)) {
+            handleVoiceState(guildId, memberId, member.displayName, 'leave').catch(() => {});
+        }
+
+        if (!member.presence) continue;
         
         const activity = member.presence?.activities?.find(a => a.type === ActivityType.Playing);
         if (!activity) continue;
@@ -28,6 +40,7 @@ const processGuildSessions = async (client, guildId) => {
         if (!activeGamesFromDiscord.has(gameName)) {
             activeGamesFromDiscord.set(gameName, []);
         }
+
         activeGamesFromDiscord.get(gameName).push({
             id: member.id,
             displayName: member.displayName
@@ -82,17 +95,18 @@ const processGuildSessions = async (client, guildId) => {
                 const message = await channel.messages.fetch(state.lastMessage.messageId);
                 if (message) {
                     const ui = await getUI(guildId, 'sessions');
+
                     const embed = new EmbedBuilder()
                         .setColor('#57F287')
-                        .setTitle(ui.title || "Активні сесії")
-                        .setFooter({ text: ui.footer || "Оновлено" })
+                        .setTitle(ui.title)
+                        .setFooter({ text: ui.footer })
                         .setTimestamp();
 
                     const gameNames = Object.keys(state.games);
                     let description = '';
 
                     if (gameNames.length === 0) {
-                        description = ui.empty || "*Немає активних ігор.*";
+                        description = ui.empty;
                     } else {
                         const sortedGames = gameNames.map(name => ({
                             name,
@@ -106,7 +120,7 @@ const processGuildSessions = async (client, guildId) => {
                             const playersArr = Object.values(game.players).sort((a, b) => a.startTime - b.startTime);
                             for (const player of playersArr) {
                                 const playerLength = Date.now() - player.startTime;
-                                description += `👤 ${player.displayName} ⏱️ \`${formatTime(playerLength)}\`\n`;
+                                description += `└ 👤 ${player.displayName} ⏱️ \`${formatTime(playerLength)}\`\n`;
                             }
                             description += '\n';
                         }
@@ -131,19 +145,52 @@ const processGuildSessions = async (client, guildId) => {
                 const message = await channel.messages.fetch(state.lastHofMessage.messageId);
                 if (message) {
                     const data = await getHallOfFameData(guildId, client);
+                    const voiceData = await getVoiceHallOfFame(guildId, client);
                     const ui = await getUI(guildId, 'halloffame');
 
                     const embed = new EmbedBuilder()
-                        .setTitle(ui.title || "🏆 Зал слави")
+                        .setTitle(ui.title)
                         .setColor('#2b2d31')
-                        .setFooter({ text: "Оновлено" })
+                        .setFooter({ text: ui.footer })
                         .setTimestamp();
 
+                    const medals = ['🥇', '🥈', '🥉'];
+
+                    let streakText = '';
+                    if (voiceData.topStreaks.length > 0) {
+                        voiceData.topStreaks.forEach((user, index) => {
+                            streakText += formatUI(ui.voiceStreakLine, {
+                                medal: medals[index] ? medals[index] : '',
+                                user: user.username,
+                                streak: user.currentStreak
+                            });
+                        });
+                    } else {
+                        streakText = ui.empty;
+                    }
+                    embed.addFields({ name: ui.voiceStreaksTitle, value: streakText, inline: false });
+
+                    let voiceTimeText = '';
+                    if (voiceData.topTime.length > 0) {
+                        voiceData.topTime.forEach((user, index) => {
+                            voiceTimeText += formatUI(ui.voiceTimeLine, {
+                                medal: medals[index] ? medals[index] : '',
+                                user: user.username,
+                                time: formatTime(user.totalTime)
+                            });
+                        });
+                    } else {
+                        voiceTimeText = ui.empty;
+                    }
+                    embed.addFields({ name: ui.voiceTimeTitle, value: voiceTimeText, inline: false });
+
+                    embed.addFields({ name: '\u200B', value: ui.gamesSeparator, inline: false });
+
                     if (!data || data.length === 0) {
-                        embed.setDescription(ui.empty || "*Порожньо*");
+                        embed.addFields({ name: ui.gamesTitle, value: ui.empty, inline: false });
                     } else {
                         data.forEach((game, index) => {
-                            const gameTitle = formatUI(ui.gameTitle || "**{rank}. {game}** - ⏳ {time}", {
+                            const gameTitle = formatUI(ui.gameTitle, {
                                 rank: index + 1,
                                 game: game.gameName,
                                 time: formatTime(game.totalTime)
@@ -151,9 +198,8 @@ const processGuildSessions = async (client, guildId) => {
 
                             let playersText = '';
                             game.topPlayers.forEach((player, pIndex) => {
-                                const medals = ['🥇', '🥈', '🥉'];
-                                playersText += formatUI(ui.playerLine || "{medal} {user}: {time}\n", {
-                                    medal: medals[pIndex],
+                                playersText += formatUI(ui.playerLine, {
+                                    medal: medals[pIndex] ? medals[pIndex] : '',
                                     user: player.username,
                                     time: formatTime(player.time)
                                 });
@@ -161,7 +207,7 @@ const processGuildSessions = async (client, guildId) => {
 
                             embed.addFields({
                                 name: gameTitle,
-                                value: playersText || (ui.noPlayers || "Немає гравців"),
+                                value: playersText ? playersText : ui.noPlayers,
                                 inline: false
                             });
                         });

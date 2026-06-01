@@ -5,8 +5,9 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences
-    ] 
+        GatewayIntentBits.GuildPresences,
+        GatewayIntentBits.GuildVoiceStates
+    ]
 });
 
 client.commands = new Collection();
