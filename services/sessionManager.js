@@ -149,69 +149,51 @@ const processGuildSessions = async (client, guildId) => {
                     const ui = await getUI(guildId, 'halloffame');
 
                     const embed = new EmbedBuilder()
-                        .setTitle(ui.title)
-                        .setColor('#2b2d31')
+                        .setTitle(`${ui.title}`)
+                        .setColor('#FFD700')
                         .setFooter({ text: ui.footer })
                         .setTimestamp();
 
                     const medals = ['🥇', '🥈', '🥉'];
 
-                    let streakText = '';
+                    let voiceDesc = `**${ui.voiceStreaksTitle}**\n`;
                     if (voiceData.topStreaks.length > 0) {
                         voiceData.topStreaks.forEach((user, index) => {
-                            streakText += formatUI(ui.voiceStreakLine, {
-                                medal: medals[index] ? medals[index] : '',
-                                user: user.username,
-                                streak: user.currentStreak
-                            });
+                            const medal = medals[index] || '🏅';
+                            voiceDesc += `└ ${medal} **${user.username}** — ${user.currentStreak} дн.\n`;
                         });
                     } else {
-                        streakText = ui.empty;
+                        voiceDesc += `└ ${ui.empty}\n`;
                     }
-                    embed.addFields({ name: ui.voiceStreaksTitle, value: streakText, inline: false });
 
-                    let voiceTimeText = '';
+                    voiceDesc += `\n**${ui.voiceTimeTitle}**\n`;
                     if (voiceData.topTime.length > 0) {
                         voiceData.topTime.forEach((user, index) => {
-                            voiceTimeText += formatUI(ui.voiceTimeLine, {
-                                medal: medals[index] ? medals[index] : '',
-                                user: user.username,
-                                time: formatTime(user.totalTime)
-                            });
+                            const medal = medals[index] || '🏅';
+                            voiceDesc += `└ ${medal} **${user.username}** — ⏱️ \`${formatTime(user.totalTime)}\`\n`;
                         });
                     } else {
-                        voiceTimeText = ui.empty;
+                        voiceDesc += `└ ${ui.empty}\n`;
                     }
-                    embed.addFields({ name: ui.voiceTimeTitle, value: voiceTimeText, inline: false });
 
-                    embed.addFields({ name: '\u200B', value: ui.gamesSeparator, inline: false });
+                    embed.addFields({ name: '🗣️ Голосова Активність', value: voiceDesc, inline: false });
 
+                    let gamesDesc = '';
                     if (!data || data.length === 0) {
-                        embed.addFields({ name: ui.gamesTitle, value: ui.empty, inline: false });
+                        gamesDesc = ui.empty;
                     } else {
-                        data.forEach((game, index) => {
-                            const gameTitle = formatUI(ui.gameTitle, {
-                                rank: index + 1,
-                                game: game.gameName,
-                                time: formatTime(game.totalTime)
-                            });
-
-                            let playersText = '';
+                        data.forEach((game) => {
+                            gamesDesc += `🎮 **${game.gameName}** - ⏳ \`${formatTime(game.totalTime)}\`\n`;
                             game.topPlayers.forEach((player, pIndex) => {
-                                playersText += formatUI(ui.playerLine, {
-                                    medal: medals[pIndex] ? medals[pIndex] : '',
-                                    user: player.username,
-                                    time: formatTime(player.time)
-                                });
+                                const medal = medals[pIndex] || '🏅';
+                                gamesDesc += `└ ${medal} ${player.username} ⏱️ \`${formatTime(player.time)}\`\n`;
                             });
-
-                            embed.addFields({
-                                name: gameTitle,
-                                value: playersText ? playersText : ui.noPlayers,
-                                inline: false
-                            });
+                            gamesDesc += '\n';
                         });
                     }
+
+                    embed.addFields({ name: `🕹️ ${ui.gamesTitle}`, value: gamesDesc || ui.empty, inline: false });
+                    
                     await message.edit({ content: null, embeds: [embed] });
                 }
             }
