@@ -5,6 +5,7 @@ module.exports = {
     name: Events.PresenceUpdate,
     async execute(oldPresence, newPresence) {
         if (!newPresence.guild) return;
+        
         updateGuildSessions(newPresence.client, newPresence.guild.id);
     },
 };

@@ -1,14 +1,7 @@
 const { ActivityType, EmbedBuilder } = require('discord.js');
 const { getSessionsState, saveSessionsState } = require('./firebaseService');
-const { getUI } = require('./uiService');
-
-const formatTime = (ms) => {
-    const totalMinutes = Math.floor(ms / 60000);
-    if (totalMinutes < 1) return '0хв';
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    return hours > 0 ? `${hours}г ${minutes}хв` : `${minutes}хв`;
-};
+const { getUI, formatUI } = require('./uiService');
+const { updateGameTime, getHallOfFameData, formatTime } = require('./playtimeService');
 
 const processGuildSessions = async (client, guildId) => {
     const guild = client.guilds.cache.get(guildId);
@@ -22,35 +15,40 @@ const processGuildSessions = async (client, guildId) => {
         client.gameSessions.set(guildId, state);
     }
 
-    let members;
-    try {
-        members = await guild.members.fetch({ withPresences: true });
-    } catch (e) {
-        return;
-    }
-
+    const members = guild.members.cache;
     const activeGamesFromDiscord = new Map();
 
     for (const [memberId, member] of members) {
         if (member.user.bot || !member.presence) continue;
-
-        const activity = member.presence.activities.find(a => a.type === ActivityType.Playing);
+        
+        const activity = member.presence?.activities?.find(a => a.type === ActivityType.Playing);
         if (!activity) continue;
 
         const gameName = activity.name;
-
         if (!activeGamesFromDiscord.has(gameName)) {
             activeGamesFromDiscord.set(gameName, []);
         }
-
         activeGamesFromDiscord.get(gameName).push({
             id: member.id,
             displayName: member.displayName
         });
     }
 
-    const updatedGames = {};
+    for (const [oldGameName, oldGameData] of Object.entries(state.games)) {
+        for (const [oldPlayerId, oldPlayer] of Object.entries(oldGameData.players)) {
+            const isStillPlaying = activeGamesFromDiscord.has(oldGameName) && 
+                                   activeGamesFromDiscord.get(oldGameName).some(p => p.id === oldPlayerId);
+            
+            if (!isStillPlaying) {
+                const duration = Date.now() - oldPlayer.startTime;
+                if (duration > 60000) { 
+                    updateGameTime(guildId, oldPlayerId, oldPlayer.displayName, oldGameName, duration).catch(() => {});
+                }
+            }
+        }
+    }
 
+    const updatedGames = {};
     for (const [gameName, activePlayers] of activeGamesFromDiscord.entries()) {
         const existingGame = state.games[gameName] || {
             sessionStart: Date.now(),
@@ -69,7 +67,6 @@ const processGuildSessions = async (client, guildId) => {
                 };
             }
         }
-
         existingGame.players = newPlayers;
         updatedGames[gameName] = existingGame;
     }
@@ -85,18 +82,17 @@ const processGuildSessions = async (client, guildId) => {
                 const message = await channel.messages.fetch(state.lastMessage.messageId);
                 if (message) {
                     const ui = await getUI(guildId, 'sessions');
-
                     const embed = new EmbedBuilder()
                         .setColor('#57F287')
-                        .setTitle(ui.title)
-                        .setFooter({ text: ui.footer })
+                        .setTitle(ui.title || "Активні сесії")
+                        .setFooter({ text: ui.footer || "Оновлено" })
                         .setTimestamp();
 
                     const gameNames = Object.keys(state.games);
                     let description = '';
 
                     if (gameNames.length === 0) {
-                        description = ui.empty;
+                        description = ui.empty || "*Немає активних ігор.*";
                     } else {
                         const sortedGames = gameNames.map(name => ({
                             name,
@@ -105,26 +101,77 @@ const processGuildSessions = async (client, guildId) => {
 
                         for (const game of sortedGames) {
                             const sessionLength = Date.now() - game.sessionStart;
-                            description += `🎮 **${game.name}** - ⏱️ \`${formatTime(sessionLength)}\`\n`;
+                            description += `🎮 **${game.name}** - ⏳ \`${formatTime(sessionLength)}\`\n`;
                             
                             const playersArr = Object.values(game.players).sort((a, b) => a.startTime - b.startTime);
-                            
                             for (const player of playersArr) {
                                 const playerLength = Date.now() - player.startTime;
-                                description += `└ 👤 ${player.displayName} — \`${formatTime(playerLength)}\`\n`;
+                                description += `👤 ${player.displayName} ⏱️ \`${formatTime(playerLength)}\`\n`;
                             }
                             description += '\n';
                         }
                     }
 
                     embed.setDescription(description.trim());
-
                     await message.edit({ content: null, embeds: [embed] });
                 }
             }
         } catch (err) {
             if (err.code === 10008 || err.code === 10003) {
                 state.lastMessage = null;
+                saveSessionsState(guildId, state).catch(() => {});
+            }
+        }
+    }
+
+    if (state.lastHofMessage && state.lastHofMessage.channelId && state.lastHofMessage.messageId) {
+        try {
+            const channel = await client.channels.fetch(state.lastHofMessage.channelId);
+            if (channel) {
+                const message = await channel.messages.fetch(state.lastHofMessage.messageId);
+                if (message) {
+                    const data = await getHallOfFameData(guildId, client);
+                    const ui = await getUI(guildId, 'halloffame');
+
+                    const embed = new EmbedBuilder()
+                        .setTitle(ui.title || "🏆 Зал слави")
+                        .setColor('#2b2d31')
+                        .setFooter({ text: "Оновлено" })
+                        .setTimestamp();
+
+                    if (!data || data.length === 0) {
+                        embed.setDescription(ui.empty || "*Порожньо*");
+                    } else {
+                        data.forEach((game, index) => {
+                            const gameTitle = formatUI(ui.gameTitle || "**{rank}. {game}** - ⏳ {time}", {
+                                rank: index + 1,
+                                game: game.gameName,
+                                time: formatTime(game.totalTime)
+                            });
+
+                            let playersText = '';
+                            game.topPlayers.forEach((player, pIndex) => {
+                                const medals = ['🥇', '🥈', '🥉'];
+                                playersText += formatUI(ui.playerLine || "{medal} {user}: {time}\n", {
+                                    medal: medals[pIndex],
+                                    user: player.username,
+                                    time: formatTime(player.time)
+                                });
+                            });
+
+                            embed.addFields({
+                                name: gameTitle,
+                                value: playersText || (ui.noPlayers || "Немає гравців"),
+                                inline: false
+                            });
+                        });
+                    }
+                    await message.edit({ content: null, embeds: [embed] });
+                }
+            }
+        } catch (err) {
+            if (err.code === 10008 || err.code === 10003) {
+                state.lastHofMessage = null;
                 saveSessionsState(guildId, state).catch(() => {});
             }
         }
@@ -146,4 +193,4 @@ const updateGuildSessions = (client, guildId) => {
     client.sessionUpdateTimers.set(guildId, timer);
 };
 
-module.exports = { updateGuildSessions };
+module.exports = { updateGuildSessions, formatTime };

@@ -29,5 +29,13 @@ module.exports = {
     },
     system: {
         error: "Виникла помилка під час виконання цієї команди!"
-    }
+    },
+    halloffame: {
+        empty: "Статистика наразі порожня.",
+        title: "🏆 Зал Слави",
+        gameTitle: "**{rank}. {game}** — {time}",
+        playerLine: "{medal} {user}: {time}\n",
+        noPlayers: "Немає даних про гравців",
+        error: "Сталася помилка при завантаженні Залу слави."
+    },
 };
