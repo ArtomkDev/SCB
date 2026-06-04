@@ -1,120 +1,80 @@
-const { db } = require('./firebaseService');
-
-const activeVoiceSessions = new Map();
+const { getData } = require('./dataService');
 
 const getTodayDateString = () => new Date().toISOString().split('T')[0];
 
-async function handleVoiceState(guildId, userId, username, action) {
-    const sessionKey = `${guildId}_${userId}`;
+const handleVoiceState = (guildId, userId, username, action) => {
+    const data = getData(guildId);
+    const today = getTodayDateString();
 
     if (action === 'join') {
-        activeVoiceSessions.set(sessionKey, Date.now());
+        data.activeVoiceSessions.set(userId, Date.now());
         
-        const userRef = db.collection('guilds').doc(guildId).collection('voiceStats').doc(userId);
-        await db.runTransaction(async (transaction) => {
-            const userDoc = await transaction.get(userRef);
-            const today = getTodayDateString();
-            
-            let currentStreak = 1;
-            let lastJoinDate = today;
-            let totalTime = 0;
+        let userStats = data.voiceStats.get(userId) || { username, currentStreak: 1, lastJoinDate: today, totalTime: 0 };
+        
+        if (userStats.lastJoinDate) {
+            const prevDate = new Date(userStats.lastJoinDate);
+            const currDate = new Date(today);
+            const diffDays = Math.ceil(Math.abs(currDate - prevDate) / (1000 * 60 * 60 * 24));
 
-            if (userDoc.exists) {
-                const data = userDoc.data();
-                totalTime = data.totalTime || 0;
-                const previousJoinDate = data.lastJoinDate;
-
-                if (previousJoinDate) {
-                    const prevDate = new Date(previousJoinDate);
-                    const currDate = new Date(today);
-                    const diffTime = Math.abs(currDate - prevDate);
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-                    if (diffDays === 1) {
-                        currentStreak = (data.currentStreak || 0) + 1;
-                    } else if (diffDays === 0) {
-                        currentStreak = data.currentStreak || 1;
-                    } else {
-                        currentStreak = 1;
-                    }
-                }
+            if (diffDays === 1) {
+                userStats.currentStreak = (userStats.currentStreak || 0) + 1;
+            } else if (diffDays > 1) {
+                userStats.currentStreak = 1;
             }
-
-            transaction.set(userRef, {
-                username,
-                currentStreak,
-                lastJoinDate: today,
-                totalTime
-            }, { merge: true });
-        });
-    } 
-    else if (action === 'leave') {
-        const joinTime = activeVoiceSessions.get(sessionKey);
+        }
+        
+        userStats.lastJoinDate = today;
+        userStats.username = username;
+        data.voiceStats.set(userId, userStats);
+    } else if (action === 'leave') {
+        const joinTime = data.activeVoiceSessions.get(userId);
         if (joinTime) {
             const durationMs = Date.now() - joinTime;
-            activeVoiceSessions.delete(sessionKey);
-
-            const userRef = db.collection('guilds').doc(guildId).collection('voiceStats').doc(userId);
-            await db.runTransaction(async (transaction) => {
-                const userDoc = await transaction.get(userRef);
-                const currentTotal = userDoc.exists ? (userDoc.data().totalTime || 0) : 0;
-                
-                transaction.set(userRef, { 
-                    totalTime: currentTotal + durationMs 
-                }, { merge: true });
-            });
+            data.activeVoiceSessions.delete(userId);
+            
+            let userStats = data.voiceStats.get(userId) || { username, currentStreak: 1, lastJoinDate: today, totalTime: 0 };
+            userStats.totalTime = (userStats.totalTime || 0) + durationMs;
+            data.voiceStats.set(userId, userStats);
         }
     }
-}
+};
 
-async function getVoiceHallOfFame(guildId, client) {
-    const statsRef = db.collection('guilds').doc(guildId).collection('voiceStats');
-    const guild = client ? client.guilds.cache.get(guildId) : null;
-    
-    const streakSnapshot = await statsRef.orderBy('currentStreak', 'desc').limit(3).get();
-    const topStreaks = streakSnapshot.docs.map(doc => {
-        let displayName = doc.data().username;
+const getVoiceHallOfFame = (guildId, client) => {
+    const data = getData(guildId);
+    const guild = client?.guilds.cache.get(guildId);
+    const now = Date.now();
+
+    const voiceStatsArray = Array.from(data.voiceStats.entries()).map(([userId, stats]) => {
+        let activeTime = 0;
+        if (data.activeVoiceSessions.has(userId)) {
+            activeTime = now - data.activeVoiceSessions.get(userId);
+        }
+
+        let displayName = stats.username;
         if (guild) {
-            const member = guild.members.cache.get(doc.id);
+            const member = guild.members.cache.get(userId);
             if (member) displayName = member.displayName;
         }
-        return {
-            userId: doc.id,
-            ...doc.data(),
-            username: displayName
-        };
-    }).filter(user => user.currentStreak > 0);
 
-    const timeSnapshot = await statsRef.get();
-    let allVoiceStats = timeSnapshot.docs.map(doc => {
-        let displayName = doc.data().username;
-        if (guild) {
-            const member = guild.members.cache.get(doc.id);
-            if (member) displayName = member.displayName;
-        }
         return {
-            userId: doc.id,
-            ...doc.data(),
-            username: displayName
+            userId,
+            ...stats,
+            username: displayName,
+            totalTime: (stats.totalTime || 0) + activeTime
         };
     });
 
-    const now = Date.now();
+    const topStreaks = [...voiceStatsArray]
+        .filter(u => u.currentStreak > 0)
+        .sort((a, b) => b.currentStreak - a.currentStreak)
+        .slice(0, 3);
 
-    for (let user of allVoiceStats) {
-        const sessionKey = `${guildId}_${user.userId}`;
-        if (activeVoiceSessions.has(sessionKey)) {
-            const activeTime = now - activeVoiceSessions.get(sessionKey);
-            user.totalTime = (user.totalTime || 0) + activeTime;
-        }
-    }
-
-    const topTime = allVoiceStats
-        .filter(user => (user.totalTime || 0) > 60000)
+    const topTime = [...voiceStatsArray]
+        .filter(u => u.totalTime > 60000)
         .sort((a, b) => b.totalTime - a.totalTime)
         .slice(0, 3);
 
     return { topStreaks, topTime };
-}
+};
 
-module.exports = { handleVoiceState, getVoiceHallOfFame, activeVoiceSessions };
+module.exports = { handleVoiceState, getVoiceHallOfFame };

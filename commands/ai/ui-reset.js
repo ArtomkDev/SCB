@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { updateGuildConfig } = require('../../services/firebaseService');
+const { getData, saveGuildData } = require('../../services/dataService');
 const { getUI } = require('../../services/uiService');
 
 module.exports = {
@@ -15,7 +15,10 @@ module.exports = {
         const guildId = interaction.guild.id;
 
         try {
-            await updateGuildConfig(guildId, { customUI: null });
+            const data = getData(guildId);
+            data.config.customUI = null;
+            await saveGuildData(guildId);
+
             const aiUI = await getUI(guildId, 'ai');
             await interaction.editReply(aiUI.resetSuccess);
         } catch (error) {

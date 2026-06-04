@@ -1,104 +1,62 @@
-const { db } = require('./firebaseService');
+const { getData } = require('./dataService');
 
-const dbCache = new Map();
+const updateGameTime = (guildId, userId, username, gameName, durationMs) => {
+    const data = getData(guildId);
+    
+    let gameData = data.gameStats.get(gameName) || { totalTime: 0, players: new Map() };
+    gameData.totalTime += durationMs;
 
-async function updateGameTime(guildId, userId, username, gameName, durationMs) {
-    const gameRef = db.collection('guilds').doc(guildId).collection('gameStats').doc(gameName);
-    const userRef = gameRef.collection('players').doc(userId);
+    let playerData = gameData.players.get(userId) || { username, time: 0 };
+    playerData.time += durationMs;
+    playerData.username = username;
 
-    await db.runTransaction(async (transaction) => {
-        const gameDoc = await transaction.get(gameRef);
-        const userDoc = await transaction.get(userRef);
+    gameData.players.set(userId, playerData);
+    data.gameStats.set(gameName, gameData);
+};
 
-        const newGameTotal = (gameDoc.exists ? gameDoc.data().totalTime : 0) + durationMs;
-        const newUserTotal = (userDoc.exists ? userDoc.data().time : 0) + durationMs;
-
-        transaction.set(gameRef, { totalTime: newGameTotal }, { merge: true });
-        transaction.set(userRef, { username, time: newUserTotal }, { merge: true });
-    });
-}
-
-async function getHallOfFameData(guildId, client) {
-    const cacheKey = `hof_db_${guildId}`;
-    let cached = dbCache.get(cacheKey);
-
-    if (!cached || Date.now() - cached.timestamp > 60000) {
-        const gamesSnapshot = await db.collection('guilds').doc(guildId).collection('gameStats')
-            .orderBy('totalTime', 'desc')
-            .limit(20)
-            .get();
-
-        const freshMergedGames = new Map();
-
-        for (const doc of gamesSnapshot.docs) {
-            const gameName = doc.id;
-            const totalTime = doc.data().totalTime || 0;
-            
-            const playersSnapshot = await db.collection('guilds').doc(guildId).collection('gameStats')
-                .doc(gameName).collection('players').get();
-            
-            const playersMap = new Map();
-            for (const pDoc of playersSnapshot.docs) {
-                playersMap.set(pDoc.id, { username: pDoc.data().username, time: pDoc.data().time || 0 });
-            }
-            
-            freshMergedGames.set(gameName, { totalTime, players: playersMap });
-        }
-
-        cached = { timestamp: Date.now(), data: freshMergedGames };
-        dbCache.set(cacheKey, cached);
-    }
-
-    const guild = client ? client.guilds.cache.get(guildId) : null;
+const getHallOfFameData = (guildId, client) => {
+    const data = getData(guildId);
+    const guild = client?.guilds.cache.get(guildId);
     const mergedGames = new Map();
 
-    for (const [key, val] of cached.data.entries()) {
+    for (const [gameName, gameData] of data.gameStats.entries()) {
         const playersCopy = new Map();
-        for (const [pKey, pVal] of val.players.entries()) {
-            let displayName = pVal.username;
+        for (const [userId, pData] of gameData.players.entries()) {
+            let displayName = pData.username;
             if (guild) {
-                const member = guild.members.cache.get(pKey);
+                const member = guild.members.cache.get(userId);
                 if (member) displayName = member.displayName;
             }
-            playersCopy.set(pKey, { username: displayName, time: pVal.time });
+            playersCopy.set(userId, { username: displayName, time: pData.time });
         }
-        mergedGames.set(key, { totalTime: val.totalTime, players: playersCopy });
+        mergedGames.set(gameName, { totalTime: gameData.totalTime, players: playersCopy });
     }
 
-    if (client) {
-        const activeState = client.gameSessions?.get(guildId);
-        if (activeState && activeState.games) {
-            for (const [activeGameName, activeGameData] of Object.entries(activeState.games)) {
-                
-                if (!mergedGames.has(activeGameName)) {
-                    mergedGames.set(activeGameName, { totalTime: 0, players: new Map() });
-                }
-                
-                const gameData = mergedGames.get(activeGameName);
-                
-                for (const [playerId, playerObj] of Object.entries(activeGameData.players)) {
-                    const activeDuration = Date.now() - playerObj.startTime;
-                    
-                    gameData.totalTime += activeDuration;
-                    
-                    if (!gameData.players.has(playerId)) {
-                        gameData.players.set(playerId, { username: playerObj.displayName, time: 0 });
-                    }
-                    gameData.players.get(playerId).time += activeDuration;
+    if (data.sessions?.games) {
+        for (const [gameName, activeGameData] of Object.entries(data.sessions.games)) {
+            if (!mergedGames.has(gameName)) {
+                mergedGames.set(gameName, { totalTime: 0, players: new Map() });
+            }
+            const gameData = mergedGames.get(gameName);
 
-                    if (guild) {
-                        const member = guild.members.cache.get(playerId);
-                        if (member) {
-                            gameData.players.get(playerId).username = member.displayName;
-                        }
-                    }
+            for (const [userId, playerObj] of Object.entries(activeGameData.players)) {
+                const activeDuration = Date.now() - playerObj.startTime;
+                gameData.totalTime += activeDuration;
+
+                if (!gameData.players.has(userId)) {
+                    gameData.players.set(userId, { username: playerObj.displayName, time: 0 });
+                }
+                gameData.players.get(userId).time += activeDuration;
+
+                if (guild) {
+                    const member = guild.members.cache.get(userId);
+                    if (member) gameData.players.get(userId).username = member.displayName;
                 }
             }
         }
     }
 
     const hallOfFame = [];
-    
     for (const [gameName, gameData] of mergedGames.entries()) {
         if (gameData.totalTime < 60000) continue;
 
@@ -106,28 +64,18 @@ async function getHallOfFameData(guildId, client) {
             .sort((a, b) => b.time - a.time)
             .slice(0, 3);
         
-        hallOfFame.push({
-            gameName,
-            totalTime: gameData.totalTime,
-            topPlayers: sortedPlayers
-        });
+        hallOfFame.push({ gameName, totalTime: gameData.totalTime, topPlayers: sortedPlayers });
     }
 
     return hallOfFame.sort((a, b) => b.totalTime - a.totalTime).slice(0, 10);
-}
+};
 
-function formatTime(ms) {
+const formatTime = (ms) => {
     const totalMinutes = Math.floor(ms / 60000);
     if (totalMinutes < 1) return '0 хв';
-    
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
-
     return hours > 0 ? `${hours} год ${minutes} хв` : `${minutes} хв`;
-}
-
-module.exports = {
-    updateGameTime,
-    getHallOfFameData,
-    formatTime
 };
+
+module.exports = { updateGameTime, getHallOfFameData, formatTime };

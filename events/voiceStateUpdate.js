@@ -3,7 +3,7 @@ const { handleVoiceState } = require('../services/voiceService');
 
 module.exports = {
     name: Events.VoiceStateUpdate,
-    async execute(oldState, newState, client) {
+    execute(oldState, newState, client) {
         if (newState.member.user.bot) return;
 
         const guildId = newState.guild.id;
@@ -11,10 +11,10 @@ module.exports = {
         const username = newState.member.displayName;
 
         if (!oldState.channelId && newState.channelId) {
-            await handleVoiceState(guildId, userId, username, 'join');
+            handleVoiceState(guildId, userId, username, 'join');
         }
         else if (oldState.channelId && !newState.channelId) {
-            await handleVoiceState(guildId, userId, username, 'leave');
+            handleVoiceState(guildId, userId, username, 'leave');
         }
     },
 };

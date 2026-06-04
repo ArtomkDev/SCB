@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { getGuildConfig, updateGuildConfig } = require('../../services/firebaseService');
+const { getData, saveGuildData } = require('../../services/dataService');
 const { generateAiResponse } = require('../../services/aiService');
 const { defaultUI, getUI, formatUI } = require('../../services/uiService');
 
@@ -16,28 +16,27 @@ module.exports = {
         const guildId = interaction.guild.id;
 
         try {
-            const config = await getGuildConfig(guildId);
-            const apiKeys = config.apiKeys || {};
+            const data = getData(guildId);
+            const apiKeys = data.config?.apiKeys || {};
             const aiUI = await getUI(guildId, 'ai');
 
             if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic) {
                 return interaction.editReply(aiUI.keyMissing);
             }
 
-            if (!config.aiSystemPrompt) {
+            if (!data.config.aiSystemPrompt) {
                 return interaction.editReply(aiUI.promptMissing);
             }
 
-            const prompt = `Rewrite all string values in the following JSON object to strictly match this persona/character: "${config.aiSystemPrompt}". Keep the exact same JSON keys and nested structure. Do not alter any placeholders inside curly braces like {user}, {guild}, {target}, or {error}. Return ONLY a valid JSON object without any additional text, markdown formatting, or code blocks.\n\n${JSON.stringify(defaultUI)}`;
-            
+            const prompt = `Rewrite all string values in the following JSON object to strictly match this persona/character: "${data.config.aiSystemPrompt}". Keep the exact same JSON keys and nested structure. Do not alter any placeholders inside curly braces like {user}, {guild}, {target}, or {error}. Return ONLY a valid JSON object without any additional text, markdown formatting, or code blocks.\n\n${JSON.stringify(defaultUI)}`;
             const systemPrompt = "You are a JSON data generator. Return only raw, valid JSON.";
             
             const response = await generateAiResponse(prompt, systemPrompt, apiKeys);
-            
             const cleanJson = response.replace(/^```(json)?\s*/i, '').replace(/\s*```$/i, '').trim();
             const customUI = JSON.parse(cleanJson);
 
-            await updateGuildConfig(guildId, { customUI });
+            data.config.customUI = customUI;
+            await saveGuildData(guildId);
             
             const updatedUI = await getUI(guildId, 'ai');
             await interaction.editReply(updatedUI.personalizeSuccess);

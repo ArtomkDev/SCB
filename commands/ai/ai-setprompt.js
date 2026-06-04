@@ -1,5 +1,5 @@
-const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { updateGuildConfig } = require('../../services/firebaseService');
+const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require('discord.js');
+const { getData, saveGuildData } = require('../../services/dataService');
 const { getUI, formatUI } = require('../../services/uiService');
 
 module.exports = {
@@ -10,7 +10,7 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) 
         .addStringOption(option => 
             option.setName('prompt')
-                .setDescription('Як ШІ має відповідати? (напр: "Ти злий пірат", "Ти турботлива мама")')
+                .setDescription('Як ШІ має відповідати?')
                 .setRequired(true)
         ),
     
@@ -20,12 +20,14 @@ module.exports = {
         const promptText = interaction.options.getString('prompt');
         const guildId = interaction.guild.id;
         
-        await interaction.deferReply({ ephemeral: true });
-        
+        await interaction.deferReply({ flags: MessageFlags.Ephemeral });
         const ui = await getUI(guildId, 'ai');
 
         try {
-            await updateGuildConfig(guildId, { aiSystemPrompt: promptText });
+            const data = getData(guildId);
+            data.config.aiSystemPrompt = promptText;
+            await saveGuildData(guildId);
+
             await interaction.editReply(formatUI(ui.promptSaved, { prompt: promptText }));
         } catch (error) {
             await interaction.editReply(ui.promptSaveError);

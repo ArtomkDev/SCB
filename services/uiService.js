@@ -1,17 +1,15 @@
-const { getGuildConfig } = require('./firebaseService');
+const { getData } = require('./dataService');
 const defaultUI = require('./ui/defaultUI');
 
 const getUI = async (guildId, moduleName) => {
-    const config = await getGuildConfig(guildId);
-    const customUI = config.customUI || {};
+    const data = getData(guildId);
+    const customUI = data.config?.customUI || {};
 
     const moduleDefaults = defaultUI[moduleName] || {};
     const moduleCustoms = customUI[moduleName] || {};
 
     return new Proxy(moduleDefaults, {
-        get: (target, prop) => {
-            return moduleCustoms[prop] || target[prop];
-        }
+        get: (target, prop) => moduleCustoms[prop] || target[prop]
     });
 };
 

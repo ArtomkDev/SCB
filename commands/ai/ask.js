@@ -1,6 +1,6 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { generateAiResponse } = require('../../services/aiService');
-const { getGuildConfig } = require('../../services/firebaseService');
+const { getData } = require('../../services/dataService');
 const { getUI } = require('../../services/uiService');
 
 module.exports = {
@@ -20,14 +20,11 @@ module.exports = {
         const ui = await getUI(guildId, 'ai');
 
         try {
-            const guildConfig = await getGuildConfig(guildId);
-            const systemPrompt = guildConfig.systemPrompt || "You are a helpful Discord bot.";
+            const data = getData(guildId);
+            const systemPrompt = data.config?.systemPrompt || "You are a helpful Discord bot.";
 
             const aiResponse = await generateAiResponse(userPrompt, systemPrompt);
-
-            const safeResponse = aiResponse.length > 2000 
-                ? aiResponse.substring(0, 1997) + '...' 
-                : aiResponse;
+            const safeResponse = aiResponse.length > 2000 ? aiResponse.substring(0, 1997) + '...' : aiResponse;
 
             await interaction.editReply(safeResponse);
             

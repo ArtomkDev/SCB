@@ -1,5 +1,5 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
-const { updateGuildConfig } = require('../../services/firebaseService');
+const { getData, saveGuildData } = require('../../services/dataService');
 const { getUI, formatUI } = require('../../services/uiService');
 
 module.exports = {
@@ -33,11 +33,10 @@ module.exports = {
         const ui = await getUI(guildId, 'ai');
 
         try {
-            await updateGuildConfig(guildId, {
-                apiKeys: {
-                    [provider]: key
-                }
-            });
+            const data = getData(guildId);
+            if (!data.config.apiKeys) data.config.apiKeys = {};
+            data.config.apiKeys[provider] = key;
+            await saveGuildData(guildId);
 
             await interaction.editReply(formatUI(ui.keySaved, { provider }));
         } catch (error) {
