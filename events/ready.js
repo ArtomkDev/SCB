@@ -1,6 +1,6 @@
 const { Events } = require('discord.js');
 const { updateGuildSessions } = require('../services/sessionManager');
-const { initializeData } = require('../services/dataService');
+const { initializeData, saveGuildData } = require('../services/dataService');
 
 module.exports = {
     name: Events.ClientReady,
@@ -13,5 +13,12 @@ module.exports = {
                 updateGuildSessions(client, guild.id);
             }
         }, 60000);
+
+        setInterval(async () => {
+            for (const guild of client.guilds.cache.values()) {
+                // Передаємо guild.name сюди
+                await saveGuildData(guild.id, guild.name);
+            }
+        }, 600000);
     },
 };
