@@ -12,6 +12,8 @@ const updateGameTime = (guildId, userId, username, gameName, durationMs) => {
 
     gameData.players.set(userId, playerData);
     data.gameStats.set(gameName, gameData);
+    
+    data.dirty.games.add(gameName);
 };
 
 const getHallOfFameData = (guildId, client) => {

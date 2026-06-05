@@ -16,7 +16,13 @@ const loadGuildData = async (guildId, guildName = 'Unknown Server') => {
         gameStats: new Map(),
         sessions: { games: {} },
         config: {},
-        activeVoiceSessions: new Map()
+        activeVoiceSessions: new Map(),
+        dirty: {
+            voice: new Set(),
+            games: new Set(),
+            sessions: false,
+            config: false
+        }
     };
 
     try {
@@ -55,7 +61,17 @@ const saveGuildData = async (guildId, guildName = 'Unknown Server') => {
     const guildCache = cache.get(guildId);
     if (!guildCache) return;
 
-    console.log(`[Firebase] Server "${guildName}" (${guildId}) requested to save data.`);
+    const hasChanges = guildCache.dirty.voice.size > 0 || 
+                       guildCache.dirty.games.size > 0 || 
+                       guildCache.dirty.sessions || 
+                       guildCache.dirty.config;
+
+    if (!hasChanges) {
+        console.log(`[Firebase] Server "${guildName}" (${guildId}) has no new changes. Skip saving.`);
+        return;
+    }
+
+    console.log(`[Firebase] Server "${guildName}" (${guildId}) requested to save data (Delta Update).`);
 
     let batch = db.batch();
     let count = 0;
@@ -75,37 +91,52 @@ const saveGuildData = async (guildId, guildName = 'Unknown Server') => {
     try {
         const guildRef = db.collection('guilds').doc(guildId);
 
-        for (const [userId, stats] of guildCache.voiceStats) {
-            batch.set(guildRef.collection('voiceStats').doc(userId), stats, { merge: true });
-            count++;
-            if (count >= 490) await commitBatch();
-        }
-
-        for (const [gameName, gameData] of guildCache.gameStats) {
-            const playersObj = {};
-            for (const [userId, playerData] of gameData.players) {
-                playersObj[userId] = playerData;
+        for (const userId of guildCache.dirty.voice) {
+            const stats = guildCache.voiceStats.get(userId);
+            if (stats) {
+                batch.set(guildRef.collection('voiceStats').doc(userId), stats, { merge: true });
+                count++;
+                if (count >= 490) await commitBatch();
             }
+        }
 
-            batch.set(guildRef.collection('gameStats').doc(gameName), { 
-                totalTime: gameData.totalTime,
-                players: playersObj 
-            }, { merge: true });
-            
+        for (const gameName of guildCache.dirty.games) {
+            const gameData = guildCache.gameStats.get(gameName);
+            if (gameData) {
+                const playersObj = {};
+                for (const [userId, playerData] of gameData.players) {
+                    playersObj[userId] = playerData;
+                }
+
+                batch.set(guildRef.collection('gameStats').doc(gameName), { 
+                    totalTime: gameData.totalTime,
+                    players: playersObj 
+                }, { merge: true });
+                
+                count++;
+                if (count >= 490) await commitBatch();
+            }
+        }
+
+        if (guildCache.dirty.sessions) {
+            batch.set(guildRef.collection('modules').doc('sessions'), guildCache.sessions);
             count++;
             if (count >= 490) await commitBatch();
         }
 
-        batch.set(guildRef.collection('modules').doc('sessions'), guildCache.sessions);
-        count++;
-        if (count >= 490) await commitBatch();
-
-        batch.set(guildRef.collection('settings').doc('config'), guildCache.config, { merge: true });
-        count++;
+        if (guildCache.dirty.config) {
+            batch.set(guildRef.collection('settings').doc('config'), guildCache.config, { merge: true });
+            count++;
+        }
         
         await commitBatch();
         
-        console.log(`[Firebase] Server "${guildName}" (${guildId}) successfully saved data.`);
+        guildCache.dirty.voice.clear();
+        guildCache.dirty.games.clear();
+        guildCache.dirty.sessions = false;
+        guildCache.dirty.config = false;
+
+        console.log(`[Firebase] Server "${guildName}" (${guildId}) successfully saved delta data.`);
     } catch (error) {
         console.error("Ой щось трапилося firebase не відповідає зачекайте. Загальна помилка:", error.message);
     }
@@ -118,7 +149,13 @@ const getData = (guildId) => {
             gameStats: new Map(),
             sessions: { games: {} },
             config: {},
-            activeVoiceSessions: new Map()
+            activeVoiceSessions: new Map(),
+            dirty: {
+                voice: new Set(),
+                games: new Set(),
+                sessions: false,
+                config: false
+            }
         });
     }
     return cache.get(guildId);

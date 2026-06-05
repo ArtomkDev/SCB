@@ -26,6 +26,9 @@ const handleVoiceState = (guildId, userId, username, action) => {
         userStats.lastJoinDate = today;
         userStats.username = username;
         data.voiceStats.set(userId, userStats);
+        
+        data.dirty.voice.add(userId);
+
     } else if (action === 'leave') {
         const joinTime = data.activeVoiceSessions.get(userId);
         if (joinTime) {
@@ -35,6 +38,8 @@ const handleVoiceState = (guildId, userId, username, action) => {
             let userStats = data.voiceStats.get(userId) || { username, currentStreak: 1, lastJoinDate: today, totalTime: 0 };
             userStats.totalTime = (userStats.totalTime || 0) + durationMs;
             data.voiceStats.set(userId, userStats);
+            
+            data.dirty.voice.add(userId);
         }
     }
 };
