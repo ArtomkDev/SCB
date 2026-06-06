@@ -36,6 +36,8 @@ module.exports = {
             const data = getData(guildId);
             if (!data.config.apiKeys) data.config.apiKeys = {};
             data.config.apiKeys[provider] = key;
+            
+            data.dirty.config = true; 
             await saveGuildData(guildId);
 
             await interaction.editReply(formatUI(ui.keySaved, { provider }));

@@ -26,6 +26,8 @@ module.exports = {
         try {
             const data = getData(guildId);
             data.config.aiSystemPrompt = promptText;
+            
+            data.dirty.config = true; 
             await saveGuildData(guildId);
 
             await interaction.editReply(formatUI(ui.promptSaved, { prompt: promptText }));

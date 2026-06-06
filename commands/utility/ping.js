@@ -32,7 +32,7 @@ module.exports = {
         const result = await startCall(interaction, targetUser, guildName, ui);
 
         if (!result.success && result.reason === 'ALREADY_CALLING') {
-            return interaction.editReply(`ALREADY_CALLING`); 
+            return interaction.editReply(ui.alreadyCalling); 
         }
     }
 };

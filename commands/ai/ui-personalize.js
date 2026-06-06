@@ -36,6 +36,8 @@ module.exports = {
             const customUI = JSON.parse(cleanJson);
 
             data.config.customUI = customUI;
+            
+            data.dirty.config = true; 
             await saveGuildData(guildId);
             
             const updatedUI = await getUI(guildId, 'ai');

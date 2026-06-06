@@ -1,6 +1,6 @@
 const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { getData, saveGuildData } = require('../../services/dataService');
-const { getUI } = require('../../services/uiService');
+const { getUI, formatUI } = require('../../services/uiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -13,16 +13,18 @@ module.exports = {
         await interaction.deferReply({ ephemeral: true });
         
         const guildId = interaction.guild.id;
+        const aiUI = await getUI(guildId, 'ai');
 
         try {
             const data = getData(guildId);
             data.config.customUI = null;
+            
+            data.dirty.config = true; 
             await saveGuildData(guildId);
 
-            const aiUI = await getUI(guildId, 'ai');
             await interaction.editReply(aiUI.resetSuccess);
         } catch (error) {
-            await interaction.editReply(`Error: ${error.message}`);
+            await interaction.editReply(formatUI(aiUI.resetError, { error: error.message }));
         }
     }
 };
