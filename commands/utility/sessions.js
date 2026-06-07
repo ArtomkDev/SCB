@@ -23,6 +23,8 @@ module.exports = {
             channelId: replyMessage.channelId,
             messageId: replyMessage.id
         };
+
+        data.dirty.sessions = true;
         await saveGuildData(guildId);
         updateGuildSessions(interaction.client, guildId);
     }

@@ -69,6 +69,8 @@ const processGuildSessions = async (client, guildId) => {
     }
 
     state.games = updatedGames;
+
+    data.dirty.sessions = true;
     await saveGuildData(guildId);
 
     if (state.lastMessage?.channelId && state.lastMessage?.messageId) {
@@ -103,6 +105,7 @@ const processGuildSessions = async (client, guildId) => {
         } catch (err) {
             if (err.code === 10008 || err.code === 10003) {
                 state.lastMessage = null;
+                data.dirty.sessions = true;
                 await saveGuildData(guildId);
             }
         }
@@ -156,6 +159,7 @@ const processGuildSessions = async (client, guildId) => {
         } catch (err) {
             if (err.code === 10008 || err.code === 10003) {
                 state.lastHofMessage = null;
+                data.dirty.sessions = true;
                 await saveGuildData(guildId);
             }
         }

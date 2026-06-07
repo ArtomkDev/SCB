@@ -59,6 +59,8 @@ module.exports = {
             const data = getData(guildId);
             const replyMessage = await interaction.fetchReply();
             data.sessions.lastHofMessage = { channelId: replyMessage.channelId, messageId: replyMessage.id };
+
+            data.dirty.sessions = true;
             await saveGuildData(guildId);
             updateGuildSessions(client, guildId);
 
