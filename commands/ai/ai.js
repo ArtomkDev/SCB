@@ -25,7 +25,7 @@ module.exports = {
             const data = getData(guildId);
             const apiKeys = data.config?.apiKeys || {};
 
-            if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic) {
+            if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic && !apiKeys.openrouter) {
                 return interaction.editReply(ui.keyMissing);
             }
 

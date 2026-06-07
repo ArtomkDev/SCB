@@ -20,7 +20,7 @@ module.exports = {
             const apiKeys = data.config?.apiKeys || {};
             const aiUI = await getUI(guildId, 'ai');
 
-            if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic) {
+            if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic && !apiKeys.openrouter) {
                 return interaction.editReply(aiUI.keyMissing);
             }
 

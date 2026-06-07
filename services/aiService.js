@@ -38,8 +38,27 @@ const callAnthropic = async (prompt, systemPrompt, apiKey) => {
     return response.content[0].text;
 };
 
+const callOpenRouter = async (prompt, systemPrompt, apiKey) => {
+    const openai = new OpenAI({ 
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey: apiKey 
+    });
+    const response = await openai.chat.completions.create({
+        model: "cognitivecomputations/dolphin-mixtral-8x7b", 
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
+    });
+    return response.choices[0].message.content;
+};
+
 const generateAiResponse = async (prompt, systemPrompt = "You are a helpful assistant.", keys = {}) => {
     const errors = [];
+
+    if (keys.openrouter) {
+        try { return await callOpenRouter(prompt, systemPrompt, keys.openrouter); } 
+        catch (e) { errors.push(`**OpenRouter**: ${e.message}`); }
+    } else {
+        errors.push(`**OpenRouter**: Ключ не налаштовано.`);
+    }
 
     if (keys.gemini) {
         try { return await callGemini(prompt, systemPrompt, keys.gemini); } 

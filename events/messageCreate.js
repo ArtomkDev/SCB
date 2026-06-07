@@ -14,7 +14,7 @@ module.exports = {
         const data = getData(guildId);
         
         const apiKeys = data.config?.apiKeys || {};
-        if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic) return;
+        if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic && !apiKeys.openrouter) return;
 
         if (!channelHistory.has(channelId)) {
             channelHistory.set(channelId, []);

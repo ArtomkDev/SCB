@@ -15,7 +15,8 @@ module.exports = {
                 .addChoices(
                     { name: 'Gemini (Google)', value: 'gemini' },
                     { name: 'GPT (OpenAI)', value: 'openai' },
-                    { name: 'Claude (Anthropic)', value: 'anthropic' }
+                    { name: 'Claude (Anthropic)', value: 'anthropic' },
+                    { name: 'OpenRouter (Uncensored)', value: 'openrouter' }
                 )
         )
         .addStringOption(option =>
