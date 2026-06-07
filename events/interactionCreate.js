@@ -1,15 +1,13 @@
 const { Events } = require('discord.js');
 const { getUI } = require('../services/uiService');
+const settingsRouter = require('../modules/settings/router'); 
 
 module.exports = {
     name: Events.InteractionCreate,
     async execute(interaction) {
         if (interaction.isChatInputCommand()) {
             const command = interaction.client.commands.get(interaction.commandName);
-
-            if (!command) {
-                return;
-            }
+            if (!command) return;
 
             try {
                 await command.execute(interaction);
@@ -31,12 +29,27 @@ module.exports = {
         }
         else if (interaction.isAutocomplete()) {
             const command = interaction.client.commands.get(interaction.commandName);
-
             if (!command) return;
 
             try {
                 await command.autocomplete(interaction);
             } catch (error) {}
+        }
+        else if (interaction.isMessageComponent() || interaction.isModalSubmit()) {
+            if (interaction.customId.startsWith('settings_') || interaction.customId.startsWith('ui_')) {
+                try {
+                    await settingsRouter.handle(interaction);
+                } catch (error) {
+                    const guildId = interaction.guild?.id;
+                    const uiSystem = guildId ? await getUI(guildId, 'system') : { error: 'Виникла помилка при обробці.' };
+
+                    if (interaction.deferred || interaction.replied) {
+                         await interaction.followUp({ content: uiSystem.error, ephemeral: true }).catch(() => {});
+                    } else {
+                         await interaction.reply({ content: uiSystem.error, ephemeral: true }).catch(() => {});
+                    }
+                }
+            }
         }
     },
 };
