@@ -117,18 +117,24 @@ module.exports = {
             try {
                 let aiResponse = await generateAiResponse(conversationContext, systemPrompt, apiKeys);
                 
-                const gifRegex = /\[GIF:\s*(.+?)\]/i;
-                const match = gifRegex.exec(aiResponse);
+                const gifRegex = /\[GIF:\s*(.+?)\]/gi;
+                let match;
+                let gifLinks = [];
                 
-                if (match) {
+                
+                while ((match = gifRegex.exec(aiResponse)) !== null) {
                     const query = match[1];
-                    const gifUrl = await getGifUrl(query, apiKeys.giphy);
+                    const gifUrl = await getGifUrl(query, apiKeys?.giphy || keys?.giphy); 
                     
                     if (gifUrl) {
-                        aiResponse = aiResponse.replace(match[0], `\n${gifUrl}`);
-                    } else {
-                        aiResponse = aiResponse.replace(match[0], '');
+                        gifLinks.push(gifUrl);
                     }
+                }
+            
+                aiResponse = aiResponse.replace(/\[GIF:\s*(.+?)\]/gi, '').trim();
+            
+                if (gifLinks.length > 0) {
+                     aiResponse += `\n\n${gifLinks.join('\n')}`;
                 }
 
                 history.push({ id: client.user.id, author: client.user.username, content: aiResponse });
