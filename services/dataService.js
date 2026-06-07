@@ -12,10 +12,8 @@ const loadGuildData = async (guildId, guildName = 'Unknown Server') => {
     const guildCache = {
         voiceStats: new Map(),
         gameStats: new Map(),
-        sessions: { games: {} },
+        sessions: { games: {}, voice: {}, streams: {} },
         config: {},
-        activeVoiceSessions: new Map(),
-        activeStreamSessions: new Map(),
         profiles: new Map(),
         dirty: {
             voice: new Set(),
@@ -45,6 +43,8 @@ const loadGuildData = async (guildId, guildName = 'Unknown Server') => {
         const sessionsDoc = await db.collection('guilds').doc(guildId).collection('modules').doc('sessions').get();
         if (sessionsDoc.exists) guildCache.sessions = sessionsDoc.data();
         if (!guildCache.sessions.games) guildCache.sessions.games = {};
+        if (!guildCache.sessions.voice) guildCache.sessions.voice = {};
+        if (!guildCache.sessions.streams) guildCache.sessions.streams = {};
 
         const configDoc = await db.collection('guilds').doc(guildId).collection('settings').doc('config').get();
         if (configDoc.exists) guildCache.config = configDoc.data();
@@ -144,10 +144,8 @@ const getData = (guildId) => {
         cache.set(guildId, {
             voiceStats: new Map(),
             gameStats: new Map(),
-            sessions: { games: {} },
+            sessions: { games: {}, voice: {}, streams: {} },
             config: {},
-            activeVoiceSessions: new Map(),
-            activeStreamSessions: new Map(),
             profiles: new Map(),
             dirty: {
                 voice: new Set(),

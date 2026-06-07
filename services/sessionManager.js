@@ -21,9 +21,9 @@ const processGuildSessions = async (client, guildId) => {
         if (member.user.bot) continue;
 
         const inVoice = !!member.voice?.channelId;
-        const isActiveVoice = data.activeVoiceSessions.has(memberId);
+        const isActiveVoice = !!data.sessions.voice[memberId];
         const isStreaming = !!member.voice?.streaming;
-        const isActiveStream = data.activeStreamSessions.has(memberId);
+        const isActiveStream = !!data.sessions.streams[memberId];
 
         if (inVoice && !isActiveVoice) {
             handleVoiceState(guildId, memberId, member.displayName, 'join');
@@ -93,7 +93,7 @@ const processGuildSessions = async (client, guildId) => {
                     const embed = new EmbedBuilder()
                         .setColor('#57F287')
                         .setTitle(ui.title)
-                        .setFooter({ text: ui.footer })
+                        .setFooter({ text: ui.footer }) 
                         .setTimestamp();
                     
                     const gameNames = Object.keys(state.games);
@@ -139,7 +139,7 @@ const processGuildSessions = async (client, guildId) => {
                     const embed = new EmbedBuilder()
                         .setTitle(ui.title)
                         .setColor('#FFD700')
-                        .setFooter({ text: ui.footer })
+                        .setFooter({ text: ui.footer }) 
                         .setTimestamp();
 
                     let voiceDesc = `**${ui.voiceStreaksTitle}**\n`;

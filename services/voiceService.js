@@ -9,7 +9,8 @@ const handleVoiceState = (guildId, userId, username, action) => {
     let userStats = data.voiceStats.get(userId) || { username, currentStreak: 1, lastJoinDate: today, totalTime: 0, streamTime: 0 };
 
     if (action === 'join') {
-        data.activeVoiceSessions.set(userId, Date.now());
+        data.sessions.voice[userId] = Date.now();
+        data.dirty.sessions = true;
         
         if (userStats.lastJoinDate) {
             const prevDate = new Date(userStats.lastJoinDate);
@@ -29,25 +30,29 @@ const handleVoiceState = (guildId, userId, username, action) => {
         data.dirty.voice.add(userId);
 
     } else if (action === 'leave') {
-        const joinTime = data.activeVoiceSessions.get(userId);
+        const joinTime = data.sessions.voice[userId];
         if (joinTime) {
             const durationMs = Date.now() - joinTime;
-            data.activeVoiceSessions.delete(userId);
+            delete data.sessions.voice[userId];
+            data.dirty.sessions = true;
             
             userStats.totalTime = (userStats.totalTime || 0) + durationMs;
             data.voiceStats.set(userId, userStats);
             data.dirty.voice.add(userId);
         }
     } else if (action === 'start_stream') {
-        data.activeStreamSessions.set(userId, Date.now());
+        data.sessions.streams[userId] = Date.now();
+        data.dirty.sessions = true;
+        
         userStats.username = username;
         data.voiceStats.set(userId, userStats);
         data.dirty.voice.add(userId);
     } else if (action === 'stop_stream') {
-        const streamStart = data.activeStreamSessions.get(userId);
+        const streamStart = data.sessions.streams[userId];
         if (streamStart) {
             const durationMs = Date.now() - streamStart;
-            data.activeStreamSessions.delete(userId);
+            delete data.sessions.streams[userId];
+            data.dirty.sessions = true;
             
             userStats.streamTime = (userStats.streamTime || 0) + durationMs;
             data.voiceStats.set(userId, userStats);
@@ -63,13 +68,13 @@ const getVoiceHallOfFame = (guildId, client) => {
 
     const voiceStatsArray = Array.from(data.voiceStats.entries()).map(([userId, stats]) => {
         let activeTime = 0;
-        if (data.activeVoiceSessions.has(userId)) {
-            activeTime = now - data.activeVoiceSessions.get(userId);
+        if (data.sessions.voice[userId]) {
+            activeTime = now - data.sessions.voice[userId];
         }
 
         let activeStreamTime = 0;
-        if (data.activeStreamSessions.has(userId)) {
-            activeStreamTime = now - data.activeStreamSessions.get(userId);
+        if (data.sessions.streams[userId]) {
+            activeStreamTime = now - data.sessions.streams[userId];
         }
 
         let displayName = stats.username;
