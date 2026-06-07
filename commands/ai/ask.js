@@ -39,7 +39,7 @@ module.exports = {
 
             while ((match = gifRegex.exec(aiResponse)) !== null) {
                 const query = match[1];
-                const gifUrl = await getGifUrl(query, apiKeys?.giphy || keys?.giphy); 
+                const gifUrl = await getGifUrl(query, apiKeys?.giphy); 
                 
                 if (gifUrl) {
                     gifLinks.push(gifUrl);

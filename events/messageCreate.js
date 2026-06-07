@@ -120,19 +120,19 @@ module.exports = {
                 const gifRegex = /\[GIF:\s*(.+?)\]/gi;
                 let match;
                 let gifLinks = [];
-                
+
                 
                 while ((match = gifRegex.exec(aiResponse)) !== null) {
                     const query = match[1];
-                    const gifUrl = await getGifUrl(query, apiKeys?.giphy || keys?.giphy); 
-                    
+                    const gifUrl = await getGifUrl(query, apiKeys?.giphy); 
+
                     if (gifUrl) {
                         gifLinks.push(gifUrl);
                     }
                 }
-            
+
                 aiResponse = aiResponse.replace(/\[GIF:\s*(.+?)\]/gi, '').trim();
-            
+
                 if (gifLinks.length > 0) {
                      aiResponse += `\n\n${gifLinks.join('\n')}`;
                 }
