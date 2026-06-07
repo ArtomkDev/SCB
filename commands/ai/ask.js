@@ -1,7 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { generateAiResponse } = require('../../services/aiService');
 const { getData } = require('../../services/dataService');
-const { getUI } = require('../../services/uiService');
+const { getUI, formatUI } = require('../../services/uiService');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -21,15 +21,21 @@ module.exports = {
 
         try {
             const data = getData(guildId);
-            const systemPrompt = data.config?.systemPrompt || "You are a helpful Discord bot.";
+            const apiKeys = data.config?.apiKeys || {};
+            const systemPrompt = data.config?.aiSystemPrompt || "You are a helpful Discord bot.";
 
-            const aiResponse = await generateAiResponse(userPrompt, systemPrompt);
+            if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic && !apiKeys.openrouter) {
+                return interaction.editReply(ui.keyMissing);
+            }
+
+            const aiResponse = await generateAiResponse(userPrompt, systemPrompt, apiKeys);
             const safeResponse = aiResponse.length > 2000 ? aiResponse.substring(0, 1997) + '...' : aiResponse;
 
             await interaction.editReply(safeResponse);
             
         } catch (error) {
-            await interaction.editReply(ui.askError);
+            const errorMessage = formatUI(ui.aiError, { error: error.message });
+            await interaction.editReply(errorMessage.length > 2000 ? errorMessage.substring(0, 1997) + '...' : errorMessage);
         }
     },
 };
