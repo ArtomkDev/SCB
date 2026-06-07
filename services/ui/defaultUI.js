@@ -36,12 +36,12 @@ module.exports = {
     },
     halloffame: {
         empty: "Статистика наразі порожня.",
-        title: "Зал Слави Сервера",
-        footer: "SCB Statistics",
+        title: "🏆 Зал Слави Сервера",
+        footer: "Останнє оновлення",
         voiceTitle: "🗣️ Голосова Активність",
-        voiceStreaksTitle: "🔥 Стріки в Voice",
-        voiceTimeTitle: "🎙️ Загальний час у Voice",
-        voiceStreamTitle: "📺 Трансляція екрану",
+        voiceStreaksTitle: "🔥 Топ самих відданих (Серії заходів)",
+        voiceTimeTitle: "🎙️ Найдовше у войсі",
+        voiceStreamTitle: "📺 Найдовше транслюють екран",
         gamesTitle: "🕹️ Ігрова Статистика",
         error: "❌ Сталася помилка при завантаженні Залу слави."
     },

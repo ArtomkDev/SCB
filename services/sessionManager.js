@@ -4,6 +4,9 @@ const { getUI, formatUI } = require('./uiService');
 const { updateGameTime, getHallOfFameData, formatTime } = require('./playtimeService');
 const { getVoiceHallOfFame, handleVoiceState } = require('./voiceService');
 
+const placeEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+const medals = ['🥇', '🥈', '🥉'];
+
 const processGuildSessions = async (client, guildId) => {
     const guild = client.guilds.cache.get(guildId);
     if (!guild) return;
@@ -87,7 +90,12 @@ const processGuildSessions = async (client, guildId) => {
                 const message = await channel.messages.fetch(state.lastMessage.messageId);
                 if (message) {
                     const ui = await getUI(guildId, 'sessions');
-                    const embed = new EmbedBuilder().setColor('#57F287').setTitle(ui.title).setFooter({ text: ui.footer }).setTimestamp();
+                    const embed = new EmbedBuilder()
+                        .setColor('#57F287')
+                        .setTitle(ui.title)
+                        .setFooter({ text: ui.footer })
+                        .setTimestamp();
+                    
                     const gameNames = Object.keys(state.games);
                     let description = '';
                     if (gameNames.length === 0) {
@@ -128,65 +136,54 @@ const processGuildSessions = async (client, guildId) => {
                     const voiceData = getVoiceHallOfFame(guildId, client);
                     const ui = await getUI(guildId, 'halloffame');
 
-                    const placeEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
-
                     const embed = new EmbedBuilder()
-                        .setTitle(`🏆 ${ui.title}`)
+                        .setTitle(ui.title)
                         .setColor('#FFD700')
                         .setFooter({ text: ui.footer })
-                        .setTimestamp()
-                        .setThumbnail(guild.iconURL({ dynamic: true }));
+                        .setTimestamp();
 
-                    let voiceStreaksText = '';
+                    let voiceDesc = `**${ui.voiceStreaksTitle}**\n`;
                     if (voiceData.topStreaks.length > 0) {
                         voiceData.topStreaks.forEach((user, index) => {
-                            const emoji = placeEmojis[index] || '🏅';
-                            voiceStreaksText += `${emoji} **${user.username}** — \`${user.currentStreak} дн.\`\n`;
+                            const emoji = medals[index] || '🏅';
+                            voiceDesc += `${emoji} **${user.username}** — \`${user.currentStreak} дн.\`\n`;
                         });
-                    } else voiceStreaksText = `*${ui.empty}*`;
+                    } else voiceDesc += `*${ui.empty}*\n`;
 
-                    let voiceTimeText = '';
+                    voiceDesc += `\n**${ui.voiceTimeTitle}**\n`;
                     if (voiceData.topTime.length > 0) {
                         voiceData.topTime.forEach((user, index) => {
-                            const emoji = placeEmojis[index] || '🏅';
-                            voiceTimeText += `${emoji} **${user.username}** — \`${formatTime(user.totalTime)}\`\n`;
+                            const emoji = medals[index] || '🏅';
+                            voiceDesc += `${emoji} **${user.username}** — ⏱️ \`${formatTime(user.totalTime)}\`\n`;
                         });
-                    } else voiceTimeText = `*${ui.empty}*`;
+                    } else voiceDesc += `*${ui.empty}*\n`;
 
-                    let voiceStreamText = '';
+                    voiceDesc += `\n**${ui.voiceStreamTitle}**\n`;
                     if (voiceData.topStreams.length > 0) {
                         voiceData.topStreams.forEach((user, index) => {
-                            const emoji = placeEmojis[index] || '🏅';
-                            voiceStreamText += `${emoji} **${user.username}** — \`${formatTime(user.streamTime)}\`\n`;
+                            const emoji = medals[index] || '🏅';
+                            voiceDesc += `${emoji} **${user.username}** — 📺 \`${formatTime(user.streamTime)}\`\n`;
                         });
-                    } else voiceStreamText = `*${ui.empty}*`;
+                    } else voiceDesc += `*${ui.empty}*\n`;
 
-                    embed.addFields(
-                        { name: `\u200B`, value: `**${ui.voiceTitle}**\n───────────────────` },
-                        { name: ui.voiceStreaksTitle, value: voiceStreaksText, inline: true },
-                        { name: ui.voiceTimeTitle, value: voiceTimeText, inline: true },
-                        { name: ui.voiceStreamTitle, value: voiceStreamText, inline: true }
-                    );
+                    embed.addFields({ name: `\u200B\n${ui.voiceTitle}`, value: voiceDesc, inline: false });
 
-                    embed.addFields({ name: `\u200B`, value: `**${ui.gamesTitle}**\n───────────────────` });
-
+                    let gamesDesc = '';
                     if (!hofData || hofData.length === 0) {
-                        embed.addFields({ name: '\u200b', value: `*${ui.empty}*` });
+                        gamesDesc = `*${ui.empty}*`;
                     } else {
                         hofData.forEach((game, gameIndex) => {
                             const gameRankEmoji = placeEmojis[gameIndex] || '🎮';
-                            let playersText = '';
+                            gamesDesc += `\n${gameRankEmoji} **${game.gameName}** — ⏳ \`${formatTime(game.totalTime)}\`\n`;
+                            
                             game.topPlayers.forEach((player, pIndex) => {
-                                const pEmoji = placeEmojis[pIndex] || '🏅';
-                                playersText += `${pEmoji} ${player.username} • \`${formatTime(player.time)}\`\n`;
-                            });
-                            embed.addFields({ 
-                                name: `${gameRankEmoji} ${game.gameName} — ⏳ ${formatTime(game.totalTime)}`, 
-                                value: playersText || `*${ui.empty}*`,
-                                inline: false 
+                                const pEmoji = medals[pIndex] || '🏅';
+                                gamesDesc += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time)}\`\n`;
                             });
                         });
                     }
+                    
+                    embed.addFields({ name: `\u200B\n${ui.gamesTitle}`, value: gamesDesc, inline: false });
                     
                     await message.edit({ content: null, embeds: [embed] });
                 }

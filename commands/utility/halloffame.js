@@ -6,6 +6,7 @@ const { getData, saveGuildData } = require('../../services/dataService');
 const { updateGuildSessions } = require('../../services/sessionManager');
 
 const placeEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+const medals = ['🥇', '🥈', '🥉'];
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -25,71 +26,53 @@ module.exports = {
             const voiceData = getVoiceHallOfFame(guildId, client);
 
             const embed = new EmbedBuilder()
-                .setTitle(`🏆 ${ui.title}`)
+                .setTitle(ui.title)
                 .setColor('#FFD700')
                 .setFooter({ text: ui.footer })
-                .setTimestamp()
-                .setThumbnail(interaction.guild.iconURL({ dynamic: true }));
+                .setTimestamp();
 
-            let voiceStreaksText = '';
+            let voiceDesc = `**${ui.voiceStreaksTitle}**\n`;
             if (voiceData.topStreaks.length > 0) {
                 voiceData.topStreaks.forEach((user, index) => {
-                    const emoji = placeEmojis[index] || '🏅';
-                    voiceStreaksText += `${emoji} **${user.username}** — \`${user.currentStreak} дн.\`\n`;
+                    const emoji = medals[index] || '🏅';
+                    voiceDesc += `${emoji} **${user.username}** — \`${user.currentStreak} дн.\`\n`;
                 });
-            } else {
-                voiceStreaksText = `*${ui.empty}*`;
-            }
+            } else voiceDesc += `*${ui.empty}*\n`;
 
-            let voiceTimeText = '';
+            voiceDesc += `\n**${ui.voiceTimeTitle}**\n`;
             if (voiceData.topTime.length > 0) {
                 voiceData.topTime.forEach((user, index) => {
-                    const emoji = placeEmojis[index] || '🏅';
-                    voiceTimeText += `${emoji} **${user.username}** — \`${formatTime(user.totalTime)}\`\n`;
+                    const emoji = medals[index] || '🏅';
+                    voiceDesc += `${emoji} **${user.username}** — ⏱️ \`${formatTime(user.totalTime)}\`\n`;
                 });
-            } else {
-                voiceTimeText = `*${ui.empty}*`;
-            }
+            } else voiceDesc += `*${ui.empty}*\n`;
 
-            let voiceStreamText = '';
+            voiceDesc += `\n**${ui.voiceStreamTitle}**\n`;
             if (voiceData.topStreams.length > 0) {
                 voiceData.topStreams.forEach((user, index) => {
-                    const emoji = placeEmojis[index] || '🏅';
-                    voiceStreamText += `${emoji} **${user.username}** — \`${formatTime(user.streamTime)}\`\n`;
+                    const emoji = medals[index] || '🏅';
+                    voiceDesc += `${emoji} **${user.username}** — 📺 \`${formatTime(user.streamTime)}\`\n`;
                 });
-            } else {
-                voiceStreamText = `*${ui.empty}*`;
-            }
+            } else voiceDesc += `*${ui.empty}*\n`;
 
-            embed.addFields(
-                { name: `\u200B`, value: `**${ui.voiceTitle}**\n───────────────────` },
-                { name: ui.voiceStreaksTitle, value: voiceStreaksText, inline: true },
-                { name: ui.voiceTimeTitle, value: voiceTimeText, inline: true },
-                { name: ui.voiceStreamTitle, value: voiceStreamText, inline: true }
-            );
+            embed.addFields({ name: `\u200B\n${ui.voiceTitle}`, value: voiceDesc, inline: false });
 
-
-            embed.addFields({ name: `\u200B`, value: `**${ui.gamesTitle}**\n───────────────────` });
-
+            let gamesDesc = '';
             if (!gameData || gameData.length === 0) {
-                 embed.addFields({ name: '\u200b', value: `*${ui.empty}*` });
+                gamesDesc = `*${ui.empty}*`;
             } else {
                 gameData.forEach((game, gameIndex) => {
                     const gameRankEmoji = placeEmojis[gameIndex] || '🎮'; 
+                    gamesDesc += `\n${gameRankEmoji} **${game.gameName}** — ⏳ \`${formatTime(game.totalTime)}\`\n`;
                     
-                    let playersText = '';
                     game.topPlayers.forEach((player, pIndex) => {
-                         const pEmoji = placeEmojis[pIndex] || '🏅';
-                         playersText += `${pEmoji} ${player.username} • \`${formatTime(player.time)}\`\n`;
-                    });
-
-                    embed.addFields({ 
-                        name: `${gameRankEmoji} ${game.gameName} — ⏳ ${formatTime(game.totalTime)}`, 
-                        value: playersText || `*${ui.empty}*`,
-                        inline: false 
+                        const pEmoji = medals[pIndex] || '🏅';
+                        gamesDesc += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time)}\`\n`;
                     });
                 });
             }
+
+            embed.addFields({ name: `\u200B\n${ui.gamesTitle}`, value: gamesDesc, inline: false });
 
             await interaction.editReply({ embeds: [embed] });
 
