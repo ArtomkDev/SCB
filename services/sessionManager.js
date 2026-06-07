@@ -128,44 +128,65 @@ const processGuildSessions = async (client, guildId) => {
                     const voiceData = getVoiceHallOfFame(guildId, client);
                     const ui = await getUI(guildId, 'halloffame');
 
-                    const embed = new EmbedBuilder().setTitle(ui.title).setColor('#FFD700').setFooter({ text: ui.footer }).setTimestamp();
-                    const medals = ['🥇', '🥈', '🥉'];
+                    const placeEmojis = ['1️⃣', '2️⃣', '3️⃣', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
 
-                    let voiceDesc = `**${ui.voiceStreaksTitle}**\n`;
+                    const embed = new EmbedBuilder()
+                        .setTitle(`🏆 ${ui.title}`)
+                        .setColor('#FFD700')
+                        .setFooter({ text: ui.footer })
+                        .setTimestamp()
+                        .setThumbnail(guild.iconURL({ dynamic: true }));
+
+                    let voiceStreaksText = '';
                     if (voiceData.topStreaks.length > 0) {
                         voiceData.topStreaks.forEach((user, index) => {
-                            voiceDesc += `└ ${medals[index] || '🏅'} **${user.username}** — ${user.currentStreak} дн.\n`;
+                            const emoji = placeEmojis[index] || '🏅';
+                            voiceStreaksText += `${emoji} **${user.username}** — \`${user.currentStreak} дн.\`\n`;
                         });
-                    } else voiceDesc += `└ ${ui.empty}\n`;
+                    } else voiceStreaksText = `*${ui.empty}*`;
 
-                    voiceDesc += `\n**${ui.voiceTimeTitle}**\n`;
+                    let voiceTimeText = '';
                     if (voiceData.topTime.length > 0) {
                         voiceData.topTime.forEach((user, index) => {
-                            voiceDesc += `└ ${medals[index] || '🏅'} **${user.username}** — ⏱️ \`${formatTime(user.totalTime)}\`\n`;
+                            const emoji = placeEmojis[index] || '🏅';
+                            voiceTimeText += `${emoji} **${user.username}** — \`${formatTime(user.totalTime)}\`\n`;
                         });
-                    } else voiceDesc += `└ ${ui.empty}\n`;
+                    } else voiceTimeText = `*${ui.empty}*`;
 
-                    voiceDesc += `\n**${ui.voiceStreamTitle || '📺 Топ за часом трансляції екрана'}**\n`;
+                    let voiceStreamText = '';
                     if (voiceData.topStreams.length > 0) {
                         voiceData.topStreams.forEach((user, index) => {
-                            voiceDesc += `└ ${medals[index] || '🏅'} **${user.username}** — 📺 \`${formatTime(user.streamTime)}\`\n`;
+                            const emoji = placeEmojis[index] || '🏅';
+                            voiceStreamText += `${emoji} **${user.username}** — \`${formatTime(user.streamTime)}\`\n`;
                         });
-                    } else voiceDesc += `└ ${ui.empty}\n`;
+                    } else voiceStreamText = `*${ui.empty}*`;
 
-                    embed.addFields({ name: '🗣️ Голосова Активність', value: voiceDesc, inline: false });
+                    embed.addFields(
+                        { name: `\u200B`, value: `**${ui.voiceTitle}**\n───────────────────` },
+                        { name: ui.voiceStreaksTitle, value: voiceStreaksText, inline: true },
+                        { name: ui.voiceTimeTitle, value: voiceTimeText, inline: true },
+                        { name: ui.voiceStreamTitle, value: voiceStreamText, inline: true }
+                    );
 
-                    let gamesDesc = '';
-                    if (!hofData || hofData.length === 0) gamesDesc = ui.empty;
-                    else {
-                        hofData.forEach((game) => {
-                            gamesDesc += `🎮 **${game.gameName}** - ⏳ \`${formatTime(game.totalTime)}\`\n`;
+                    embed.addFields({ name: `\u200B`, value: `**${ui.gamesTitle}**\n───────────────────` });
+
+                    if (!hofData || hofData.length === 0) {
+                        embed.addFields({ name: '\u200b', value: `*${ui.empty}*` });
+                    } else {
+                        hofData.forEach((game, gameIndex) => {
+                            const gameRankEmoji = placeEmojis[gameIndex] || '🎮';
+                            let playersText = '';
                             game.topPlayers.forEach((player, pIndex) => {
-                                gamesDesc += `└ ${medals[pIndex] || '🏅'} ${player.username} ⏱️ \`${formatTime(player.time)}\`\n`;
+                                const pEmoji = placeEmojis[pIndex] || '🏅';
+                                playersText += `${pEmoji} ${player.username} • \`${formatTime(player.time)}\`\n`;
                             });
-                            gamesDesc += '\n';
+                            embed.addFields({ 
+                                name: `${gameRankEmoji} ${game.gameName} — ⏳ ${formatTime(game.totalTime)}`, 
+                                value: playersText || `*${ui.empty}*`,
+                                inline: false 
+                            });
                         });
                     }
-                    embed.addFields({ name: `🕹️ ${ui.gamesTitle}`, value: gamesDesc || ui.empty, inline: false });
                     
                     await message.edit({ content: null, embeds: [embed] });
                 }
