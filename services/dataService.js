@@ -15,6 +15,7 @@ const loadGuildData = async (guildId, guildName = 'Unknown Server') => {
         sessions: { games: {} },
         config: {},
         activeVoiceSessions: new Map(),
+        activeStreamSessions: new Map(),
         profiles: new Map(),
         dirty: {
             voice: new Set(),
@@ -146,6 +147,7 @@ const getData = (guildId) => {
             sessions: { games: {} },
             config: {},
             activeVoiceSessions: new Map(),
+            activeStreamSessions: new Map(),
             profiles: new Map(),
             dirty: {
                 voice: new Set(),

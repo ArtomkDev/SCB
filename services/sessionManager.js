@@ -19,11 +19,18 @@ const processGuildSessions = async (client, guildId) => {
 
         const inVoice = !!member.voice?.channelId;
         const isActiveVoice = data.activeVoiceSessions.has(memberId);
+        const isStreaming = !!member.voice?.streaming;
+        const isActiveStream = data.activeStreamSessions.has(memberId);
 
         if (inVoice && !isActiveVoice) {
             handleVoiceState(guildId, memberId, member.displayName, 'join');
+            if (isStreaming) handleVoiceState(guildId, memberId, member.displayName, 'start_stream');
         } else if (!inVoice && isActiveVoice) {
+            if (isActiveStream) handleVoiceState(guildId, memberId, member.displayName, 'stop_stream');
             handleVoiceState(guildId, memberId, member.displayName, 'leave');
+        } else if (inVoice && isActiveVoice) {
+            if (isStreaming && !isActiveStream) handleVoiceState(guildId, memberId, member.displayName, 'start_stream');
+            if (!isStreaming && isActiveStream) handleVoiceState(guildId, memberId, member.displayName, 'stop_stream');
         }
 
         if (!member.presence) continue;
@@ -135,6 +142,13 @@ const processGuildSessions = async (client, guildId) => {
                     if (voiceData.topTime.length > 0) {
                         voiceData.topTime.forEach((user, index) => {
                             voiceDesc += `└ ${medals[index] || '🏅'} **${user.username}** — ⏱️ \`${formatTime(user.totalTime)}\`\n`;
+                        });
+                    } else voiceDesc += `└ ${ui.empty}\n`;
+
+                    voiceDesc += `\n**${ui.voiceStreamTitle || '📺 Топ за часом трансляції екрана'}**\n`;
+                    if (voiceData.topStreams.length > 0) {
+                        voiceData.topStreams.forEach((user, index) => {
+                            voiceDesc += `└ ${medals[index] || '🏅'} **${user.username}** — 📺 \`${formatTime(user.streamTime)}\`\n`;
                         });
                     } else voiceDesc += `└ ${ui.empty}\n`;
 

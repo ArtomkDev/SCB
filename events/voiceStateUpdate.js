@@ -10,11 +10,21 @@ module.exports = {
         const userId = newState.member.id;
         const username = newState.member.displayName;
 
-        if (!oldState.channelId && newState.channelId) {
+        const joinedVoice = !oldState.channelId && newState.channelId;
+        const leftVoice = oldState.channelId && !newState.channelId;
+        
+        const startedStreaming = !oldState.streaming && newState.streaming;
+        const stoppedStreaming = oldState.streaming && !newState.streaming;
+
+        if (joinedVoice) {
             handleVoiceState(guildId, userId, username, 'join');
-        }
-        else if (oldState.channelId && !newState.channelId) {
+            if (newState.streaming) handleVoiceState(guildId, userId, username, 'start_stream');
+        } else if (leftVoice) {
+            if (oldState.streaming) handleVoiceState(guildId, userId, username, 'stop_stream');
             handleVoiceState(guildId, userId, username, 'leave');
+        } else {
+            if (startedStreaming) handleVoiceState(guildId, userId, username, 'start_stream');
+            if (stoppedStreaming) handleVoiceState(guildId, userId, username, 'stop_stream');
         }
     },
 };

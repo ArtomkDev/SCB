@@ -41,6 +41,7 @@ module.exports = {
         voiceStreaksTitle: "🔥 Топ за найбільшими серіями в войсі",
         voiceStreakLine: "{medal} **{user}**: {streak} дн. підряд\n",
         voiceTimeTitle: "🎙️ Найдовше у войсі",
+        voiceStreamTitle: "📺 Топ за часом трансляції екрана",
         voiceTimeLine: "{medal} **{user}**: {time}\n",
         gamesSeparator: "🎮 **ТОП ІГОР ЗА ЧАСОМ**",
         gamesTitle: "Ігри",

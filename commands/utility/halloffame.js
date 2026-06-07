@@ -39,6 +39,13 @@ module.exports = {
                 });
             } else voiceDesc += `└ ${ui.empty}\n`;
 
+            voiceDesc += `\n**${ui.voiceStreamTitle || '📺 Топ за часом трансляції екрана'}**\n`;
+            if (voiceData.topStreams.length > 0) {
+                voiceData.topStreams.forEach((user, index) => {
+                    voiceDesc += `└ ${medals[index] || '🏅'} **${user.username}** — 📺 \`${formatTime(user.streamTime)}\`\n`;
+                });
+            } else voiceDesc += `└ ${ui.empty}\n`;
+
             embed.addFields({ name: '🗣️ Голосова Активність', value: voiceDesc, inline: false });
 
             let gamesDesc = '';
