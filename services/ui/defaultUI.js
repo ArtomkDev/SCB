@@ -38,7 +38,7 @@ module.exports = {
         empty: "Статистика наразі порожня.",
         title: "🏆 Зал Слави",
         footer: "Статистика SCB бота",
-        voiceStreaksTitle: "🔥 Топ стріків у войсі",
+        voiceStreaksTitle: "🔥 Топ за найбільшими серіями в войсі",
         voiceStreakLine: "{medal} **{user}**: {streak} дн. підряд\n",
         voiceTimeTitle: "🎙️ Найдовше у войсі",
         voiceTimeLine: "{medal} **{user}**: {time}\n",
