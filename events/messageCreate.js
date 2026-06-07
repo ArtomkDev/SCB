@@ -2,6 +2,7 @@ const { Events, ActivityType } = require('discord.js');
 const { generateAiResponse } = require('../services/aiService');
 const { getData } = require('../services/dataService');
 const { analyzeChatForFacts } = require('../services/memoryService');
+const { getGifUrl } = require('../services/gifService');
 
 const channelHistory = new Map();
 const memoryBuffers = new Map();
@@ -40,7 +41,9 @@ module.exports = {
         if (isMentioned || isRandomReply) {
             await message.channel.sendTyping();
 
-            const systemPrompt = data.config?.aiSystemPrompt || "You are a helpful Discord bot.";
+            const baseSystemPrompt = data.config?.aiSystemPrompt || "You are a helpful Discord bot.";
+            const gifInstruction = `\n\n[КРИТИЧНА СИСТЕМНА ВКАЗІВКА]: Якщо за твоїм поточним характером доречно використати GIF-анімацію для емоції чи реакції, ти ПОВИНЕН вставити в текст тег у форматі [GIF: ключові слова англійською]. Наприклад: [GIF: smug anime face] або [GIF: angry flip table]. Генеруй запити, які ідеально підкреслюють твою особистість.`;
+            const systemPrompt = baseSystemPrompt + gifInstruction;
 
             let activityContext = "\n\n--- Поточна активність на сервері ---\n";
             let hasActivity = false;
@@ -112,10 +115,25 @@ module.exports = {
             conversationContext += `\nЗараз ${message.author.displayName} звернувся. Твоє ім'я: ${client.user.username}.`;
 
             try {
-                const aiResponse = await generateAiResponse(conversationContext, systemPrompt, apiKeys);
+                let aiResponse = await generateAiResponse(conversationContext, systemPrompt, apiKeys);
+                
+                const gifRegex = /\[GIF:\s*(.+?)\]/i;
+                const match = gifRegex.exec(aiResponse);
+                
+                if (match) {
+                    const query = match[1];
+                    const gifUrl = await getGifUrl(query, apiKeys.giphy);
+                    
+                    if (gifUrl) {
+                        aiResponse = aiResponse.replace(match[0], `\n${gifUrl}`);
+                    } else {
+                        aiResponse = aiResponse.replace(match[0], '');
+                    }
+                }
+
                 history.push({ id: client.user.id, author: client.user.username, content: aiResponse });
                 if (history.length > 15) history.shift();
-                await message.reply(aiResponse);
+                await message.reply(aiResponse.trim());
             } catch (error) {}
         }
     },
