@@ -51,9 +51,9 @@ module.exports = {
                 let activities = [];
 
                 if (member.voice && member.voice.channel) {
-                    let voiceStatus = `сидить у войсі "${member.voice.channel.name}"`;
-                    if (member.voice.streaming) voiceStatus += ` (демонструє екран)`;
-                    if (member.voice.selfVideo) voiceStatus += ` (з увімкненою вебкою)`;
+                    let voiceStatus = `у войсі "${member.voice.channel.name}"`;
+                    if (member.voice.streaming) voiceStatus += ` (стрімить екран)`;
+                    if (member.voice.selfVideo) voiceStatus += ` (з вебкою)`;
                     if (member.voice.selfMute || member.voice.serverMute) voiceStatus += ` (замучений)`;
                     activities.push(voiceStatus);
                 }
@@ -65,7 +65,7 @@ module.exports = {
                             if (activity.timestamps && activity.timestamps.start) {
                                 const diffMs = Date.now() - activity.timestamps.start.getTime();
                                 const diffMins = Math.floor(diffMs / 60000);
-                                if (diffMins > 0) timeStr = ` (вже ${diffMins} хв)`;
+                                if (diffMins > 0) timeStr = ` (час: ${diffMins} хв)`;
                             }
                             activities.push(`грає в ${activity.name}${timeStr}`);
                         }
@@ -82,7 +82,7 @@ module.exports = {
                 activityContext += "Зараз ніхто ні в що не грає і не сидить у войсі.\n";
             }
 
-            activityContext += "\n[СИСТЕМНА ВКАЗІВКА]: Ти бачиш поточну активність користувачів. ПОВТОРЮЙ ТА ВИКОРИСТОВУЙ ЦІ ДАНІ ТІЛЬКИ ТОДІ, КОЛИ ЦЕ ДОРЕЧНО. Категорично заборонено перераховувати цю активність у кожній відповіді просто так!\n---------------------------------------\n";
+            activityContext += "\n[КРИТИЧНА СИСТЕМНА ВКАЗІВКА ЩОДО АКТИВНОСТІ]: Ти бачиш точний час у хвилинах. ТОБІ СУВОРО ЗАБОРОНЕНО використовувати точні цифри (наприклад, '39 хвилин' або '51 хвилина') у своїх відповідях. Ти ПОВИНЕН самостійно і природно округлювати цей час як жива людина, використовуючи ту мову, якою зараз ведеш діалог (наприклад: 'десь півгодини', 'майже годину', 'about half an hour', 'almost an hour'). Використовуй інформацію про активність ТІЛЬКИ коли це доречно.\n---------------------------------------\n";
 
             let profilesContext = "\n--- Досьє на активних користувачів (твоя довгострокова пам'ять) ---\n";
             let hasProfiles = false;
