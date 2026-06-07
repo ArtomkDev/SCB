@@ -44,7 +44,7 @@ const callOpenRouter = async (prompt, systemPrompt, apiKey) => {
         apiKey: apiKey 
     });
     const response = await openai.chat.completions.create({
-        model: "cognitivecomputations/dolphin-mixtral-8x7b", 
+        model: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free", 
         messages: [{ role: "system", content: systemPrompt }, { role: "user", content: prompt }],
     });
     return response.choices[0].message.content;
