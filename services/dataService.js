@@ -9,17 +9,17 @@ const initializeData = async (client) => {
 };
 
 const loadGuildData = async (guildId, guildName = 'Unknown Server') => {
-    console.log(`[Firebase] Server "${guildName}" (${guildId}) requested data.`);
-
     const guildCache = {
         voiceStats: new Map(),
         gameStats: new Map(),
         sessions: { games: {} },
         config: {},
         activeVoiceSessions: new Map(),
+        profiles: new Map(),
         dirty: {
             voice: new Set(),
             games: new Set(),
+            profiles: new Set(),
             sessions: false,
             config: false
         }
@@ -48,11 +48,10 @@ const loadGuildData = async (guildId, guildName = 'Unknown Server') => {
         const configDoc = await db.collection('guilds').doc(guildId).collection('settings').doc('config').get();
         if (configDoc.exists) guildCache.config = configDoc.data();
 
-        console.log(`[Firebase] Server "${guildName}" (${guildId}) successfully received data.`);
-    } catch (error) {
-        console.error(`[Firebase] Server "${guildName}" (${guildId}) failed to receive data:`, error.message);
-        console.error("Ой щось трапилося firebase не відповідає зачекайте. Помилка завантаження:", error.message);
-    }
+        const profilesSnapshot = await db.collection('guilds').doc(guildId).collection('profiles').get();
+        profilesSnapshot.forEach(doc => guildCache.profiles.set(doc.id, doc.data().facts || []));
+
+    } catch (error) {}
 
     cache.set(guildId, guildCache);
 };
@@ -63,26 +62,18 @@ const saveGuildData = async (guildId, guildName = 'Unknown Server') => {
 
     const hasChanges = guildCache.dirty.voice.size > 0 || 
                        guildCache.dirty.games.size > 0 || 
+                       guildCache.dirty.profiles.size > 0 ||
                        guildCache.dirty.sessions || 
                        guildCache.dirty.config;
 
-    if (!hasChanges) {
-        console.log(`[Firebase] Server "${guildName}" (${guildId}) has no new changes. Skip saving.`);
-        return;
-    }
-
-    console.log(`[Firebase] Server "${guildName}" (${guildId}) requested to save data (Delta Update).`);
+    if (!hasChanges) return;
 
     let batch = db.batch();
     let count = 0;
 
     const commitBatch = async () => {
         if (count > 0) {
-            try {
-                await batch.commit();
-            } catch (error) {
-                console.error("Ой щось трапилося firebase не відповідає зачекайте. Помилка збереження (commit):", error.message);
-            }
+            try { await batch.commit(); } catch (error) {}
             batch = db.batch();
             count = 0;
         }
@@ -107,12 +98,19 @@ const saveGuildData = async (guildId, guildName = 'Unknown Server') => {
                 for (const [userId, playerData] of gameData.players) {
                     playersObj[userId] = playerData;
                 }
-
                 batch.set(guildRef.collection('gameStats').doc(gameName), { 
                     totalTime: gameData.totalTime,
                     players: playersObj 
                 }, { merge: true });
-                
+                count++;
+                if (count >= 490) await commitBatch();
+            }
+        }
+
+        for (const userId of guildCache.dirty.profiles) {
+            const facts = guildCache.profiles.get(userId);
+            if (facts) {
+                batch.set(guildRef.collection('profiles').doc(userId), { facts }, { merge: true });
                 count++;
                 if (count >= 490) await commitBatch();
             }
@@ -133,13 +131,11 @@ const saveGuildData = async (guildId, guildName = 'Unknown Server') => {
         
         guildCache.dirty.voice.clear();
         guildCache.dirty.games.clear();
+        guildCache.dirty.profiles.clear();
         guildCache.dirty.sessions = false;
         guildCache.dirty.config = false;
 
-        console.log(`[Firebase] Server "${guildName}" (${guildId}) successfully saved delta data.`);
-    } catch (error) {
-        console.error("Ой щось трапилося firebase не відповідає зачекайте. Загальна помилка:", error.message);
-    }
+    } catch (error) {}
 };
 
 const getData = (guildId) => {
@@ -150,9 +146,11 @@ const getData = (guildId) => {
             sessions: { games: {} },
             config: {},
             activeVoiceSessions: new Map(),
+            profiles: new Map(),
             dirty: {
                 voice: new Set(),
                 games: new Set(),
+                profiles: new Set(),
                 sessions: false,
                 config: false
             }

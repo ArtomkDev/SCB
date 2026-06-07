@@ -1,8 +1,10 @@
-const { Events, ActivityType } = require('discord.js'); // Додано ActivityType
+const { Events, ActivityType } = require('discord.js');
 const { generateAiResponse } = require('../services/aiService');
 const { getData } = require('../services/dataService');
+const { analyzeChatForFacts } = require('../services/memoryService');
 
 const channelHistory = new Map();
+const memoryBuffers = new Map();
 
 module.exports = {
     name: Events.MessageCreate,
@@ -16,16 +18,22 @@ module.exports = {
         const apiKeys = data.config?.apiKeys || {};
         if (!apiKeys.gemini && !apiKeys.openai && !apiKeys.anthropic && !apiKeys.openrouter) return;
 
-        if (!channelHistory.has(channelId)) {
-            channelHistory.set(channelId, []);
-        }
+        if (!channelHistory.has(channelId)) channelHistory.set(channelId, []);
         const history = channelHistory.get(channelId);
-        
-        history.push({ author: message.author.displayName, content: message.content });
+        history.push({ id: message.author.id, author: message.author.displayName, content: message.content });
         if (history.length > 15) history.shift();
 
+        if (!memoryBuffers.has(channelId)) memoryBuffers.set(channelId, []);
+        const memBuf = memoryBuffers.get(channelId);
+        memBuf.push({ id: message.author.id, author: message.author.displayName, content: message.content });
+
+        if (memBuf.length >= 25) {
+            const bufferToAnalyze = [...memBuf];
+            memBuf.length = 0;
+            analyzeChatForFacts(guildId, bufferToAnalyze, apiKeys).catch(() => {});
+        }
+
         const isMentioned = message.mentions.has(client.user.id);
-        
         const randomChance = data.config?.aiRandomChance || 0; 
         const isRandomReply = Math.random() * 100 < randomChance;
 
@@ -74,26 +82,41 @@ module.exports = {
                 activityContext += "Зараз ніхто ні в що не грає і не сидить у войсі.\n";
             }
 
-            activityContext += "\n[СИСТЕМНА ВКАЗІВКА]: Ти бачиш поточну активність користувачів. ПОВТОРЮЙ ТА ВИКОРИСТОВУЙ ЦІ ДАНІ ТІЛЬКИ ТОДІ, КОЛИ ЦЕ ДОРЕЧНО (наприклад, щоб підколоти когось, або якщо в тебе прямо запитали, хто що робить). Категорично заборонено перераховувати цю активність у кожній відповіді просто так!\n---------------------------------------\n";
+            activityContext += "\n[СИСТЕМНА ВКАЗІВКА]: Ти бачиш поточну активність користувачів. ПОВТОРЮЙ ТА ВИКОРИСТОВУЙ ЦІ ДАНІ ТІЛЬКИ ТОДІ, КОЛИ ЦЕ ДОРЕЧНО. Категорично заборонено перераховувати цю активність у кожній відповіді просто так!\n---------------------------------------\n";
 
-            let conversationContext = "Ось історія останніх повідомлень в чаті для розуміння контексту:\n\n";
+            let profilesContext = "\n--- Досьє на активних користувачів (твоя довгострокова пам'ять) ---\n";
+            let hasProfiles = false;
+            
+            const recentUserIds = [...new Set(history.map(m => m.id))]; 
+            
+            recentUserIds.forEach(id => {
+                const facts = data.profiles.get(id);
+                if (facts && facts.length > 0) {
+                    const member = message.guild.members.cache.get(id);
+                    const name = member ? member.displayName : id;
+                    profilesContext += `👤 ${name}: ${facts.join(', ')}\n`;
+                    hasProfiles = true;
+                }
+            });
+
+            if (!hasProfiles) profilesContext += "Поки що немає даних.\n";
+            profilesContext += "[СИСТЕМНА ВКАЗІВКА]: Використовуй ці факти, щоб краще розуміти користувачів, адаптувати свої жарти та поведінку.\n";
+
+            let conversationContext = "Ось історія останніх повідомлень:\n\n";
             history.forEach(msg => {
                 conversationContext += `${msg.author}: ${msg.content}\n`;
             });
             
-            conversationContext += activityContext;
-            conversationContext += `\nЗараз ${message.author.displayName} звернувся або щось сказав. Відповідай йому, враховуючи попередній контекст. Твоє ім'я: ${client.user.username}.`;
+            conversationContext += "\n" + activityContext; 
+            conversationContext += "\n" + profilesContext;
+            conversationContext += `\nЗараз ${message.author.displayName} звернувся. Твоє ім'я: ${client.user.username}.`;
 
             try {
                 const aiResponse = await generateAiResponse(conversationContext, systemPrompt, apiKeys);
-                
-                history.push({ author: client.user.username, content: aiResponse });
+                history.push({ id: client.user.id, author: client.user.username, content: aiResponse });
                 if (history.length > 15) history.shift();
-
                 await message.reply(aiResponse);
-            } catch (error) {
-                console.error("AI Error:", error);
-            }
+            } catch (error) {}
         }
     },
 };
