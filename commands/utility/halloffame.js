@@ -15,43 +15,56 @@ module.exports = {
         .setDMPermission(false),
     async execute(interaction) {
         if (!interaction.inGuild()) return;
+        
         await interaction.deferReply();
         
         const guildId = interaction.guild.id;
-        const ui = await getUI(guildId, 'halloffame');
         const client = interaction.client;
+        
+        let ui;
 
         try {
-            const gameData = getHallOfFameData(guildId, client);
-            const voiceData = getVoiceHallOfFame(guildId, client);
+            ui = await getUI(guildId, 'halloffame');
+            
+            if (!ui) {
+                ui = {
+                    title: "Зал слави", footer: "Статистика", voiceTitle: "Голосові", gamesTitle: "Ігри",
+                    voiceStreaksTitle: "Стріки", voiceTimeTitle: "Час в голосових", voiceStreamTitle: "Стріми",
+                    empty: "Немає даних", error: "Сталася помилка."
+                };
+            }
+
+            const gameData = getHallOfFameData(guildId, client) || [];
+            
+            const voiceData = getVoiceHallOfFame(guildId, client) || { topStreaks: [], topTime: [], topStreams: [] };
 
             const embed = new EmbedBuilder()
-                .setTitle(ui.title)
+                .setTitle(ui.title || "Зал Слави")
                 .setColor('#FFD700')
-                .setFooter({ text: ui.footer })
+                .setFooter({ text: ui.footer || "Midnight Statistics" })
                 .setTimestamp();
 
             let voiceDesc = `**${ui.voiceStreaksTitle}**\n`;
-            if (voiceData.topStreaks.length > 0) {
+            if (voiceData.topStreaks && voiceData.topStreaks.length > 0) {
                 voiceData.topStreaks.forEach((user, index) => {
                     const emoji = medals[index] || '🏅';
-                    voiceDesc += `${emoji} **${user.username}** — \`${user.currentStreak} дн.\`\n`;
+                    voiceDesc += `${emoji} **${user.username}** — \`${user.currentStreak || 0} дн.\`\n`;
                 });
             } else voiceDesc += `*${ui.empty}*\n`;
 
             voiceDesc += `\n**${ui.voiceTimeTitle}**\n`;
-            if (voiceData.topTime.length > 0) {
+            if (voiceData.topTime && voiceData.topTime.length > 0) {
                 voiceData.topTime.forEach((user, index) => {
                     const emoji = medals[index] || '🏅';
-                    voiceDesc += `${emoji} **${user.username}** — ⏱️ \`${formatTime(user.totalTime)}\`\n`;
+                    voiceDesc += `${emoji} **${user.username}** — ⏱️ \`${formatTime(user.totalTime || 0)}\`\n`;
                 });
             } else voiceDesc += `*${ui.empty}*\n`;
 
             voiceDesc += `\n**${ui.voiceStreamTitle}**\n`;
-            if (voiceData.topStreams.length > 0) {
+            if (voiceData.topStreams && voiceData.topStreams.length > 0) {
                 voiceData.topStreams.forEach((user, index) => {
                     const emoji = medals[index] || '🏅';
-                    voiceDesc += `${emoji} **${user.username}** — 📺 \`${formatTime(user.streamTime)}\`\n`;
+                    voiceDesc += `${emoji} **${user.username}** — 📺 \`${formatTime(user.streamTime || 0)}\`\n`;
                 });
             } else voiceDesc += `*${ui.empty}*\n`;
 
@@ -63,12 +76,14 @@ module.exports = {
             } else {
                 gameData.forEach((game, gameIndex) => {
                     const gameRankEmoji = placeEmojis[gameIndex] || '🎮'; 
-                    gamesDesc += `\n${gameRankEmoji} **${game.gameName}** — ⏳ \`${formatTime(game.totalTime)}\`\n`;
+                    gamesDesc += `\n${gameRankEmoji} **${game.gameName || 'Невідома гра'}** — ⏳ \`${formatTime(game.totalTime || 0)}\`\n`;
                     
-                    game.topPlayers.forEach((player, pIndex) => {
-                        const pEmoji = medals[pIndex] || '🏅';
-                        gamesDesc += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time)}\`\n`;
-                    });
+                    if (game.topPlayers && game.topPlayers.length > 0) {
+                        game.topPlayers.forEach((player, pIndex) => {
+                            const pEmoji = medals[pIndex] || '🏅';
+                            gamesDesc += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time || 0)}\`\n`;
+                        });
+                    }
                 });
             }
 
@@ -77,16 +92,30 @@ module.exports = {
             await interaction.editReply({ embeds: [embed] });
 
             const data = getData(guildId);
-            const replyMessage = await interaction.fetchReply();
-            data.sessions.lastHofMessage = { channelId: replyMessage.channelId, messageId: replyMessage.id };
+            if (data) {
+                const replyMessage = await interaction.fetchReply();
+                
+                if (!data.sessions) data.sessions = {};
+                data.sessions.lastHofMessage = { channelId: replyMessage.channelId, messageId: replyMessage.id };
 
-            data.dirty.sessions = true;
-            await saveGuildData(guildId);
+                if (!data.dirty) data.dirty = {};
+                data.dirty.sessions = true;
+                
+                await saveGuildData(guildId);
+            }
+            
             updateGuildSessions(client, guildId);
 
         } catch (error) {
             console.error("Помилка генерації Залу Слави:", error);
-            await interaction.editReply(ui.error);
+            
+            const errorMsg = (ui && ui.error) ? ui.error : "Виникла помилка під час створення Залу Слави.";
+            
+            try {
+                await interaction.editReply({ content: errorMsg, embeds: [] });
+            } catch (e) {
+                console.error("Не вдалося надіслати повідомлення про помилку в Discord:", e);
+            }
         }
     },
 };
