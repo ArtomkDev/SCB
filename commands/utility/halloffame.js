@@ -25,69 +25,83 @@ module.exports = {
 
         try {
             ui = await getUI(guildId, 'halloffame');
-            
-            if (!ui) {
-                ui = {
-                    title: "Зал слави", footer: "Статистика", voiceTitle: "Голосові", gamesTitle: "Ігри",
-                    voiceStreaksTitle: "Стріки", voiceTimeTitle: "Час в голосових", voiceStreamTitle: "Стріми",
-                    empty: "Немає даних", error: "Сталася помилка."
-                };
-            }
 
             const gameData = getHallOfFameData(guildId, client) || [];
-            
             const voiceData = getVoiceHallOfFame(guildId, client) || { topStreaks: [], topTime: [], topStreams: [] };
 
             const embed = new EmbedBuilder()
-                .setTitle(ui.title || "Зал Слави")
+                .setTitle(ui.title)
                 .setColor('#FFD700')
-                .setFooter({ text: ui.footer || "Midnight Statistics" })
+                .setFooter({ text: ui.footer })
                 .setTimestamp();
 
-            let voiceDesc = `**${ui.voiceStreaksTitle}**\n`;
+            let streaksDesc = '';
             if (voiceData.topStreaks && voiceData.topStreaks.length > 0) {
                 voiceData.topStreaks.forEach((user, index) => {
                     const emoji = medals[index] || '🏅';
-                    voiceDesc += `${emoji} **${user.username}** — \`${user.currentStreak || 0} дн.\`\n`;
+                    streaksDesc += `${emoji} **${user.username}** — \`${user.currentStreak || 0} дн.\`\n`;
                 });
-            } else voiceDesc += `*${ui.empty}*\n`;
+            } else streaksDesc = `*${ui.empty}*`;
 
-            voiceDesc += `\n**${ui.voiceTimeTitle}**\n`;
+            let timeDesc = '';
             if (voiceData.topTime && voiceData.topTime.length > 0) {
                 voiceData.topTime.forEach((user, index) => {
                     const emoji = medals[index] || '🏅';
-                    voiceDesc += `${emoji} **${user.username}** — ⏱️ \`${formatTime(user.totalTime || 0)}\`\n`;
+                    timeDesc += `${emoji} **${user.username}** — ⏱️ \`${formatTime(user.totalTime || 0)}\`\n`;
                 });
-            } else voiceDesc += `*${ui.empty}*\n`;
+            } else timeDesc = `*${ui.empty}*`;
 
-            voiceDesc += `\n**${ui.voiceStreamTitle}**\n`;
+            let streamsDesc = '';
             if (voiceData.topStreams && voiceData.topStreams.length > 0) {
                 voiceData.topStreams.forEach((user, index) => {
                     const emoji = medals[index] || '🏅';
-                    voiceDesc += `${emoji} **${user.username}** — 📺 \`${formatTime(user.streamTime || 0)}\`\n`;
+                    streamsDesc += `${emoji} **${user.username}** — 📺 \`${formatTime(user.streamTime || 0)}\`\n`;
                 });
-            } else voiceDesc += `*${ui.empty}*\n`;
+            } else streamsDesc = `*${ui.empty}*`;
 
-            embed.addFields({ name: `\u200B\n${ui.voiceTitle}`, value: voiceDesc, inline: false });
+            embed.addFields(
+                { name: `\u200B\n🔊 ${ui.voiceTitle}: ${ui.voiceStreaksTitle}`, value: streaksDesc, inline: false },
+                { name: `🎙️ ${ui.voiceTimeTitle}`, value: timeDesc, inline: false },
+                { name: `📺 ${ui.voiceStreamTitle}`, value: streamsDesc, inline: false }
+            );
 
-            let gamesDesc = '';
             if (!gameData || gameData.length === 0) {
-                gamesDesc = `*${ui.empty}*`;
+                embed.addFields({ name: `\u200B\n🎮 ${ui.gamesTitle}`, value: `*${ui.empty}*`, inline: false });
             } else {
+                let gameChunks = [];
+                let currentChunk = '';
+
                 gameData.forEach((game, gameIndex) => {
                     const gameRankEmoji = placeEmojis[gameIndex] || '🎮'; 
-                    gamesDesc += `\n${gameRankEmoji} **${game.gameName || 'Невідома гра'}** — ⏳ \`${formatTime(game.totalTime || 0)}\`\n`;
+                    let gameEntry = `\n${gameRankEmoji} **${game.gameName || 'Невідома гра'}** — ⏳ \`${formatTime(game.totalTime || 0)}\`\n`;
                     
                     if (game.topPlayers && game.topPlayers.length > 0) {
                         game.topPlayers.forEach((player, pIndex) => {
                             const pEmoji = medals[pIndex] || '🏅';
-                            gamesDesc += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time || 0)}\`\n`;
+                            gameEntry += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time || 0)}\`\n`;
                         });
                     }
+
+                    if (currentChunk.length + gameEntry.length > 1000) {
+                        gameChunks.push(currentChunk);
+                        currentChunk = gameEntry;
+                    } else {
+                        currentChunk += gameEntry;
+                    }
+                });
+
+                if (currentChunk.length > 0) {
+                    gameChunks.push(currentChunk);
+                }
+
+                gameChunks.forEach((chunk, index) => {
+                    embed.addFields({ 
+                        name: index === 0 ? `\u200B\n🎮 ${ui.gamesTitle}` : `Продовження...`, 
+                        value: chunk, 
+                        inline: false 
+                    });
                 });
             }
-
-            embed.addFields({ name: `\u200B\n${ui.gamesTitle}`, value: gamesDesc, inline: false });
 
             await interaction.editReply({ embeds: [embed] });
 
