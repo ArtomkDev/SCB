@@ -109,12 +109,20 @@ module.exports = {
 
             let conversationContext = "Ось історія останніх повідомлень:\n\n";
             history.forEach(msg => {
-                conversationContext += `${msg.author}: ${msg.content}\n`;
+                let text = msg.content;
+                if (msg.id === client.user.id && text.length > 200) {
+                    text = text.substring(0, 200) + "... [ВЛАСНИЙ ДОВГИЙ ТЕКСТ ОБРІЗАНО ДЛЯ ЕКОНОМІЇ]";
+                }
+                conversationContext += `${msg.author}: ${text}\n`;
             });
             
             conversationContext += "\n" + activityContext; 
             conversationContext += "\n" + profilesContext;
-            conversationContext += `\nЗараз ${message.author.displayName} звернувся. Твоє ім'я: ${client.user.username}.`;
+            
+            conversationContext += `\n\n[АБСОЛЮТНИЙ ПРІОРИТЕТ - ОЦІНКА ПОТОЧНОЇ СИТУАЦІЇ]:`;
+            conversationContext += `\nЗараз користувач ${message.author.displayName} написав тобі: "${message.content}".`;
+            conversationContext += `\nЯкщо це повідомлення є тролінгом, спамом, безглуздою провокацією або тупим повторенням (наприклад "ще раз", "і що") — ТИ ПОВИНЕН ЗЛАМАТИ СВІЙ ШАБЛОН! Навіть якщо до цього ти кричав і писав величезні тексти, зараз різко ЗМІНИ ПОВЕДІНКУ. Вимкни CAPS LOCK. Напиши максимально холодну, зневажливу і коротку відповідь (ВІД 1 ДО 4 СЛІВ МАКСИМУМ). Приклади: "від'їбись", "клоун", "завали", "ну і?". Покажи, що тобі абсолютно плювати.`;
+            conversationContext += `\nТвоє ім'я: ${client.user.username}. Твоя відповідь (пам'ятай про правило вище):`;
 
             try {
                 let aiResponse = await generateAiResponse(conversationContext, systemPrompt, apiKeys);

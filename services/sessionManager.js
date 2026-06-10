@@ -104,7 +104,7 @@ const processGuildSessions = async (client, guildId) => {
                         const sortedGames = gameNames.map(name => ({ name, ...state.games[name] })).sort((a, b) => a.sessionStart - b.sessionStart).slice(0, 10);
                         for (const game of sortedGames) {
                             const sessionLength = Date.now() - game.sessionStart;
-                            description += `🎮 **${game.name}** - ⏳ \`${formatTime(sessionLength)}\`\n`;
+                            description += ` **${game.name}** - ⏳ \`${formatTime(sessionLength)}\`\n`;
                             const playersArr = Object.values(game.players).sort((a, b) => a.startTime - b.startTime);
                             for (const player of playersArr) {
                                 const playerLength = Date.now() - player.startTime;
@@ -168,22 +168,41 @@ const processGuildSessions = async (client, guildId) => {
 
                     embed.addFields({ name: `\u200B\n${ui.voiceTitle}`, value: voiceDesc, inline: false });
 
-                    let gamesDesc = '';
                     if (!hofData || hofData.length === 0) {
-                        gamesDesc = `*${ui.empty}*`;
+                        embed.addFields({ name: `\u200B\n${ui.gamesTitle}`, value: `*${ui.empty}*`, inline: false });
                     } else {
+                        let gameChunks = [];
+                        let currentChunk = '';
+
                         hofData.forEach((game, gameIndex) => {
                             const gameRankEmoji = placeEmojis[gameIndex] || '🎮';
-                            gamesDesc += `\n${gameRankEmoji} **${game.gameName}** — ⏳ \`${formatTime(game.totalTime)}\`\n`;
+                            let gameEntry = `\n${gameRankEmoji} **${game.gameName}** — ⏳ \`${formatTime(game.totalTime)}\`\n`;
                             
                             game.topPlayers.forEach((player, pIndex) => {
                                 const pEmoji = medals[pIndex] || '🏅';
-                                gamesDesc += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time)}\`\n`;
+                                gameEntry += `└ ${pEmoji} ${player.username} ⏱️ \`${formatTime(player.time)}\`\n`;
+                            });
+
+                            if (currentChunk.length + gameEntry.length > 1000) {
+                                gameChunks.push(currentChunk);
+                                currentChunk = gameEntry;
+                            } else {
+                                currentChunk += gameEntry;
+                            }
+                        });
+
+                        if (currentChunk.length > 0) {
+                            gameChunks.push(currentChunk);
+                        }
+
+                        gameChunks.forEach((chunk, index) => {
+                            embed.addFields({ 
+                                name: index === 0 ? `\u200B\n${ui.gamesTitle}` : `Продовження...`, 
+                                value: chunk, 
+                                inline: false 
                             });
                         });
                     }
-                    
-                    embed.addFields({ name: `\u200B\n${ui.gamesTitle}`, value: gamesDesc, inline: false });
                     
                     await message.edit({ content: null, embeds: [embed] });
                 }

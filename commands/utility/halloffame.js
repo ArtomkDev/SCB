@@ -60,9 +60,9 @@ module.exports = {
             } else streamsDesc = `*${ui.empty}*`;
 
             embed.addFields(
-                { name: `\u200B\n🔊 ${ui.voiceTitle}: ${ui.voiceStreaksTitle}`, value: streaksDesc, inline: false },
-                { name: `🎙️ ${ui.voiceTimeTitle}`, value: timeDesc, inline: false },
-                { name: `📺 ${ui.voiceStreamTitle}`, value: streamsDesc, inline: false }
+                { name: `\u200B\n ${ui.voiceTitle}: ${ui.voiceStreaksTitle}`, value: streaksDesc, inline: false },
+                { name: `${ui.voiceTimeTitle}`, value: timeDesc, inline: false },
+                { name: `${ui.voiceStreamTitle}`, value: streamsDesc, inline: false }
             );
 
             if (!gameData || gameData.length === 0) {
