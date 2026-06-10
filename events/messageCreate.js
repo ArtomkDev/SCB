@@ -42,8 +42,10 @@ module.exports = {
             await message.channel.sendTyping();
 
             const baseSystemPrompt = data.config?.aiSystemPrompt || "You are a helpful Discord bot.";
+            
             const gifInstruction = `\n\n[КРИТИЧНА СИСТЕМНА ВКАЗІВКА]: Якщо за твоїм поточним характером доречно використати GIF-анімацію для емоції чи реакції, ти ПОВИНЕН вставити в текст тег у форматі [GIF: ключові слова англійською]. Наприклад: [GIF: smug anime face] або [GIF: angry flip table]. Генеруй запити, які ідеально підкреслюють твою особистість.`;
-            const systemPrompt = baseSystemPrompt + gifInstruction;
+            const antiSpamInstruction = `\n\n[КРИТИЧНИЙ ЗАХИСТ ВІД СПАМУ ТА ПРОВОКАЦІЙ]: Якщо ти бачиш, що співрозмовник спамить (наприклад, повторює одне й те саме багато разів, як "ще раз"), пише безглузді повідомлення або відверто знущається чи провокує тебе — ТОБІ СУВОРО ЗАБОРОНЕНО писати великі тексти, кричати капсом або видавати довгі тиради. На спам, тролінг або дурні повторення ти ПОВИНЕН відповідати максимально коротко, сухо і холодно (1-3 слова, максимум 1 коротке речення), або просто посилати їх. Покажи, що тобі байдуже і ти не збираєшся витрачати на це свій час.`;
+            const systemPrompt = baseSystemPrompt + gifInstruction + antiSpamInstruction;
 
             let activityContext = "\n\n--- Поточна активність на сервері ---\n";
             let hasActivity = false;
